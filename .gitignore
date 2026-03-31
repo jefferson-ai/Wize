@@ -39,3 +39,9 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Custom ignores
+.env
+SpendWise_PRD_1.docx
+Icon\r
+Icon/
