@@ -12,34 +12,31 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Tag, FileText, CalendarDays, ChevronLeft, ChevronRight, Check } from 'lucide-react-native';
+import { X, Tag, FileText, CalendarDays, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
-import { addTransaction } from '../features/transactions/transactionService';
-import { getCategories, addCustomCategory } from '../features/categories/categoryService';
+import { updateTransaction, deleteTransaction } from '../features/transactions/transactionService';
+import { getCategories } from '../features/categories/categoryService';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 import { useThemeColors } from '../hooks/useThemeColors';
 
-export default function AddTransactionScreen({ navigation, route }: any) {
+export default function EditTransactionScreen({ navigation, route }: any) {
+  const { transaction } = route.params;
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
   const colors = useThemeColors();
 
-  const [type, setType] = useState<'expense' | 'income'>(route?.params?.initialType || 'expense');
-  const [amountStr, setAmountStr] = useState('');
-  const [note, setNote] = useState('');
+  const [type, setType] = useState<'expense' | 'income'>(transaction.type);
+  const [amountStr, setAmountStr] = useState(String(transaction.amount));
+  const [note, setNote] = useState(transaction.note || '');
   const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(transaction.categoryId);
   const [showCategories, setShowCategories] = useState(false);
-  const [date, setDate] = useState(new Date());
+  const [date, setDate] = useState(new Date(transaction.date));
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [customCategoryName, setCustomCategoryName] = useState('');
-  const [addingCustom, setAddingCustom] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const amountRef = useRef<TextInput>(null);
-  const customInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (user?.id) loadCategories();
@@ -50,7 +47,6 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     const cats = await getCategories(user.id);
     const filtered = cats.filter((c) => c.type === type);
     setCategories(filtered);
-    if (filtered.length > 0 && !selectedCategory) setSelectedCategory(filtered[0].id);
   };
 
   const selectedCat = categories.find((c) => c.id === selectedCategory);
@@ -71,31 +67,54 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const handleAddCustomCategory = async () => {
-    if (!customCategoryName.trim()) { Alert.alert('Error', 'Enter a category name'); return; }
-    if (!user?.id) return;
-    setAddingCustom(true);
+  const handleSave = async () => {
+    const amount = parseFloat(amountStr);
+    if (!amountStr || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Enter an amount greater than 0');
+      return;
+    }
+    if (!selectedCategory) {
+      Alert.alert('Error', 'Select a category');
+      return;
+    }
+    setSaving(true);
     try {
-      const colors = ['#b5894e', '#5c6b7a', '#4a6580', '#9e6068', '#7a6080', '#8a607a', '#5c5c8c', '#4a7a80', '#7a7a40', '#6b6560', '#8c5e4a', '#706080'];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      const newCat = await addCustomCategory(user.id, { name: customCategoryName.trim(), icon: 'tag', color: randomColor, type });
-      await loadCategories();
-      setSelectedCategory(newCat.id);
-      setCustomCategoryName('');
-      setShowCustomInput(false);
-      setShowCategories(false);
-    } catch { Alert.alert('Error', 'Failed to create category'); }
-    finally { setAddingCustom(false); }
+      await updateTransaction(transaction.id, user!.id, {
+        type,
+        amount,
+        currency,
+        categoryId: selectedCategory,
+        date: date.toISOString(),
+        note: note || null,
+      });
+      if (navigation.canGoBack()) navigation.goBack();
+    } catch {
+      Alert.alert('Error', 'Failed to update transaction');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleSubmit = async () => {
-    const amount = parseFloat(amountStr);
-    if (!amountStr || amount <= 0) { Alert.alert('Invalid Amount', 'Enter an amount greater than 0'); return; }
-    if (!selectedCategory) { Alert.alert('Error', 'Select a category'); return; }
-    try {
-      await addTransaction({ userId: user!.id, type, amount, currency, categoryId: selectedCategory, date: date.toISOString(), note: note || null, receiptUrl: null });
-      if (navigation.canGoBack()) navigation.goBack();
-    } catch { Alert.alert('Error', 'Failed to add transaction'); }
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Transaction',
+      'Are you sure you want to delete this transaction? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteTransaction(transaction.id, user!.id);
+              if (navigation.canGoBack()) navigation.goBack();
+            } catch {
+              Alert.alert('Error', 'Failed to delete transaction');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -107,7 +126,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
         <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-              
+
               {/* Header */}
               <View style={styles.modalHeader}>
                 <TouchableOpacity
@@ -118,8 +137,15 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                 >
                   <X size={18} color="#687280" />
                 </TouchableOpacity>
-                <Text style={styles.modalTitle}>New Transaction</Text>
-                <View style={{ width: 38 }} />
+                <Text style={styles.modalTitle}>Edit Transaction</Text>
+                <TouchableOpacity
+                  onPress={handleDelete}
+                  style={[styles.deleteBtn, { backgroundColor: colors.dangerBg }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Delete transaction"
+                >
+                  <Trash2 size={18} color={colors.danger} />
+                </TouchableOpacity>
               </View>
 
               {/* Type Toggle */}
@@ -168,7 +194,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                 {/* Category */}
                 <TouchableOpacity
                   style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background }]}
-                  onPress={() => { setShowCategories(!showCategories); setShowCustomInput(false); }}
+                  onPress={() => setShowCategories(!showCategories)}
                   activeOpacity={0.6}
                 >
                   <View style={[styles.fieldIcon, { backgroundColor: colors.iconBg }]}>
@@ -190,7 +216,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                         return (
                           <TouchableOpacity
                             key={cat.id}
-                            onPress={() => { setSelectedCategory(cat.id); setShowCategories(false); setShowCustomInput(false); }}
+                            onPress={() => { setSelectedCategory(cat.id); setShowCategories(false); }}
                             style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
                           >
                             <Text style={[styles.catChipText, isSelected && { color: colors.background }]}>
@@ -199,35 +225,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                           </TouchableOpacity>
                         );
                       })}
-                      <TouchableOpacity
-                        onPress={() => { setShowCustomInput(true); setTimeout(() => customInputRef.current?.focus(), 100); }}
-                        style={[styles.catChipCustom, { borderColor: colors.textMuted, backgroundColor: colors.background }]}
-                      >
-                        <Text style={[styles.catChipCustomText, { color: colors.textMuted }]}>＋ Custom</Text>
-                      </TouchableOpacity>
                     </View>
-                    {showCustomInput && (
-                      <View style={[styles.customInput, { backgroundColor: colors.background }]}>
-                        <TextInput
-                          ref={customInputRef}
-                          style={[styles.customInputField, { color: colors.text }]}
-                          placeholder="Category name..."
-                          placeholderTextColor={colors.textMuted}
-                          value={customCategoryName}
-                          onChangeText={setCustomCategoryName}
-                          autoCapitalize="words"
-                          returnKeyType="done"
-                          onSubmitEditing={handleAddCustomCategory}
-                        />
-                        <TouchableOpacity
-                          onPress={handleAddCustomCategory}
-                          disabled={addingCustom}
-                          style={[styles.customInputBtn, { backgroundColor: colors.text }]}
-                        >
-                          <Check size={16} color={colors.background} strokeWidth={2.5} />
-                        </TouchableOpacity>
-                      </View>
-                    )}
                   </View>
                 )}
 
@@ -280,10 +278,19 @@ export default function AddTransactionScreen({ navigation, route }: any) {
               </View>
             </ScrollView>
 
-            {/* Save Button */}
-            <View style={styles.saveArea}>
-              <TouchableOpacity onPress={handleSubmit} style={[styles.saveBtn, { backgroundColor: colors.text }]} activeOpacity={0.85}>
-                <Text style={[styles.saveBtnText, { color: colors.background }]}>Save Transaction</Text>
+            {/* Action Buttons */}
+            <View style={styles.actionArea}>
+              <TouchableOpacity onPress={handleDelete} style={[styles.deleteBtnBottom, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBg }]} activeOpacity={0.85}>
+                <Trash2 size={18} color={colors.danger} />
+                <Text style={[styles.deleteBtnText, { color: colors.danger }]}>Delete</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSave}
+                style={[styles.saveBtn, { backgroundColor: colors.text }, saving && { opacity: 0.6 }]}
+                activeOpacity={0.85}
+                disabled={saving}
+              >
+                <Text style={[styles.saveBtnText, { color: colors.background }]}>{saving ? 'Saving...' : 'Save Changes'}</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -301,6 +308,7 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   closeBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
   modalTitle: { fontSize: 14, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'InstrumentSans_700Bold' },
+  deleteBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
 
   typeToggle: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f5f6f7', borderRadius: 20, padding: 4, marginBottom: 20 },
   typeBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 16 },
@@ -329,12 +337,6 @@ const styles = StyleSheet.create({
   catChipActive: { backgroundColor: '#212529', borderColor: '#212529' },
   catChipText: { fontSize: 13, fontWeight: '500', color: '#687280', fontFamily: 'InstrumentSans_500Medium' },
   catChipTextActive: { color: '#ffffff' },
-  catChipCustom: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: '#c8cdd3', borderStyle: 'dashed', backgroundColor: '#fafafa' },
-  catChipCustomText: { fontSize: 13, fontWeight: '600', color: '#9aa2ad', fontFamily: 'InstrumentSans_600SemiBold' },
-
-  customInput: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: '#f5f6f7', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 4 },
-  customInputField: { flex: 1, fontSize: 15, color: '#212529', paddingVertical: 12, fontFamily: 'InstrumentSans_400Regular' },
-  customInputBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#212529', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
 
   noteInput: { flex: 1, fontSize: 15, color: '#212529', fontFamily: 'InstrumentSans_400Regular' },
 
@@ -342,7 +344,9 @@ const styles = StyleSheet.create({
   dateControls: { flexDirection: 'row', gap: 6 },
   dateBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
 
-  saveArea: { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 10 },
-  saveBtn: { backgroundColor: '#212529', borderRadius: 20, alignItems: 'center', paddingVertical: 18 },
+  actionArea: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 12, paddingTop: 10, gap: 12 },
+  deleteBtnBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 20, paddingVertical: 18, paddingHorizontal: 20, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fecaca' },
+  deleteBtnText: { color: '#dc2626', fontWeight: '700', fontSize: 15, fontFamily: 'InstrumentSans_700Bold' },
+  saveBtn: { flex: 1, backgroundColor: '#212529', borderRadius: 20, alignItems: 'center', paddingVertical: 18 },
   saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 16, fontFamily: 'InstrumentSans_700Bold' },
 });

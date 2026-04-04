@@ -4,18 +4,43 @@ import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useColorScheme } from 'nativewind';
+import { useColorScheme as useNativeColorScheme } from 'react-native';
 import { useAppSettingsStore } from './src/store/appSettingsStore';
 import './global.css';
+import { navigationRef } from './src/navigation/navigationRef';
+import { useAppNotifications } from './src/hooks/useAppNotifications';
+import { useAppQuickActions } from './src/hooks/useAppQuickActions';
 
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from './src/db';
 import migrations from './drizzle/migrations';
 
+import { useFonts } from 'expo-font';
+import {
+  InstrumentSans_400Regular,
+  InstrumentSans_500Medium,
+  InstrumentSans_600SemiBold,
+  InstrumentSans_700Bold,
+} from '@expo-google-fonts/instrument-sans';
+
 export default function App() {
-  const { colorScheme, setColorScheme } = useColorScheme();
+  useAppNotifications();
+  useAppQuickActions();
+
+  const { setColorScheme } = useColorScheme();
+  const systemColorScheme = useNativeColorScheme();
   const { theme } = useAppSettingsStore();
+  const isDark = theme === 'dark' || (theme === 'system' && systemColorScheme === 'dark');
   const { success, error } = useMigrations(db, migrations);
+
+  const [fontsLoaded] = useFonts({
+    InstrumentSans_400Regular,
+    InstrumentSans_500Medium,
+    InstrumentSans_600SemiBold,
+    InstrumentSans_700Bold,
+  });
 
   useEffect(() => {
     // Sync the zustand persisted theme configuration with NativeWind's context
@@ -30,20 +55,22 @@ export default function App() {
     );
   }
 
-  if (!success) {
+  if (!success || !fontsLoaded) {
     return (
       <View className="flex-1 justify-center items-center bg-white dark:bg-zinc-950">
-        <Text className="text-zinc-500">Loading database...</Text>
+        <Text className="text-zinc-500">Loading...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <RootNavigator />
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <NavigationContainer ref={navigationRef}>
+          <RootNavigator />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

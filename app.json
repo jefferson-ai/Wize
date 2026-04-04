@@ -12,7 +12,17 @@
       "backgroundColor": "#f0fdf4"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.SpendWise",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.919301720713-jf1vlmhqj9oq3ngct1rmd8sbs6lk457d"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +37,24 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sharing"
+      "expo-sharing",
+      "expo-font",
+      "expo-quick-actions",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosClientId": "919301720713-jf1vlmhqj9oq3ngct1rmd8sbs6lk457d.apps.googleusercontent.com",
+          "iosUrlScheme": "com.googleusercontent.apps.919301720713-jf1vlmhqj9oq3ngct1rmd8sbs6lk457d"
+        }
+      ]
     ]
   }
 }

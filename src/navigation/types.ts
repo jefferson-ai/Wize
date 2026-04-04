@@ -11,6 +11,7 @@ export type AuthStackParamList = {
   Welcome: undefined;
   SignIn: undefined;
   SignUp: undefined;
+  VerifyEmail: { email: string };
 };
 
 export type OnboardingStackParamList = {
@@ -22,7 +23,7 @@ export type MainTabParamList = {
   Home: undefined;
   Transactions: undefined;
   AddTransaction: undefined;
-  Budgets: undefined;
+  Planning: { initialTab?: 'budgets' | 'savings' } | undefined;
   Account: undefined;
 };
 

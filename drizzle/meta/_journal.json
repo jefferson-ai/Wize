@@ -8,6 +8,13 @@
       "when": 1773571027415,
       "tag": "0000_lame_scarlet_witch",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1775239806245,
+      "tag": "0001_white_speedball",
+      "breakpoints": true
     }
   ]
 }

@@ -1,59 +1,68 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Calendar } from 'lucide-react-native';
+import { X, Calendar, Trash2 } from 'lucide-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
-import { createBudget } from '../features/budgets/budgetService';
-import { getCategories } from '../features/categories/categoryService';
+import { updateBudget, deleteBudget } from '../features/budgets/budgetService';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 
-export default function AddBudgetScreen({ navigation }: any) {
+export default function EditBudgetScreen({ navigation, route }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
   const colors = useThemeColors();
   
-  const [amountStr, setAmountStr] = useState('0');
-  const [period, setPeriod] = useState<'monthly' | 'weekly'>('monthly');
-  const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const budget = route?.params?.budgetToEdit;
+  
+  const [amountStr, setAmountStr] = useState(budget?.amount?.toString() || '0');
+  const [period, setPeriod] = useState<'monthly' | 'weekly'>(budget?.period || 'monthly');
   const [loading, setLoading] = useState(false);
 
   const amountRef = useRef<TextInput>(null);
 
-  useEffect(() => {
-    if (user?.id) {
-      getCategories(user.id).then(cats => {
-        setCategories(cats.filter(c => c.type === 'expense'));
-      });
-    }
-  }, [user?.id]);
+  if (!budget) {
+      navigation.goBack();
+      return null;
+  }
 
-  const handleCreate = async () => {
+  const handleUpdate = async () => {
     const amount = parseFloat(amountStr);
     if (!amount || amount <= 0) { Alert.alert('Invalid Amount', 'Enter a valid amount greater than 0.'); return; }
-    if (!selectedCategoryId) { Alert.alert('Missing Category', 'Select a category for this budget.'); return; }
 
     setLoading(true);
     try {
-      const now = new Date();
-      let startDateStr = '';
-      if (period === 'monthly') {
-        startDateStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      } else {
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        startOfWeek.setHours(0, 0, 0, 0);
-        startDateStr = startOfWeek.toISOString();
-      }
-      await createBudget({ userId: user!.id, categoryId: selectedCategoryId, amount, period, startDate: startDateStr });
+      await updateBudget(budget.id, user!.id, { amount, period });
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error', 'Failed to create budget. Please try again.');
+      Alert.alert('Error', 'Failed to update budget. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Budget',
+      'Are you sure you want to delete this budget?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              await deleteBudget(budget.id, user!.id);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete budget.');
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -63,8 +72,8 @@ export default function AddBudgetScreen({ navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
           <X size={20} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>New Budget</Text>
-        <TouchableOpacity onPress={handleCreate} disabled={loading} style={styles.saveBtn}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Edit Budget</Text>
+        <TouchableOpacity onPress={handleUpdate} disabled={loading} style={styles.saveBtn}>
           <Text style={[styles.saveBtnText, { color: colors.text }, loading && { opacity: 0.4 }]}>Save</Text>
         </TouchableOpacity>
       </View>
@@ -114,25 +123,21 @@ export default function AddBudgetScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* Category Selection */}
-          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Select Category</Text>
-          <View style={styles.categoryGrid}>
-            {categories.map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                onPress={() => setSelectedCategoryId(cat.id)}
-                style={styles.categoryItem}
-              >
-                <View style={[
-                  styles.categoryDot,
-                  { backgroundColor: cat.color },
-                  selectedCategoryId === cat.id && { borderWidth: 3, borderColor: colors.text },
-                ]}>
-                  <Text style={[styles.categoryDotText, { color: '#ffffff' }]}>{getCategoryEmoji(cat.name)}</Text>
-                </View>
-                <Text style={[styles.categoryName, { color: colors.textMuted }]} numberOfLines={1}>{cat.name}</Text>
-              </TouchableOpacity>
-            ))}
+          {/* Locked Category Display */}
+          <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Category (Locked)</Text>
+          <View style={styles.lockedCategory}>
+            <View style={[styles.categoryDot, { backgroundColor: budget.category?.color || colors.textMuted }]}>
+              <Text style={styles.categoryDotText}>{getCategoryEmoji(budget.category?.name)}</Text>
+            </View>
+            <Text style={[styles.lockedCategoryText, { color: colors.text }]}>{budget.category?.name || 'Unknown'}</Text>
+          </View>
+          
+          {/* Delete Button */}
+          <View style={{ marginTop: 40, alignItems: 'center' }}>
+             <TouchableOpacity disabled={loading} onPress={handleDelete} style={styles.deleteBtn}>
+                 <Trash2 size={20} color={colors.danger} />
+                 <Text style={[styles.deleteText, { color: colors.danger }]}>Delete Budget</Text>
+             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -157,17 +162,15 @@ const styles = StyleSheet.create({
 
   periodToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18, padding: 4, marginBottom: 28 },
   periodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 14 },
-  periodBtnActive: { backgroundColor: '#ffffff' },
   periodBtnText: { fontWeight: '600', color: '#9aa2ad', fontSize: 14, fontFamily: 'InstrumentSans_600SemiBold' },
-  periodBtnTextActive: { color: '#212529' },
 
   sectionLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: 'InstrumentSans_700Bold' },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 20 },
-  categoryItem: { alignItems: 'center', width: 60 },
-  categoryDot: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  categoryDotSelected: { borderWidth: 3, borderColor: '#ffffff' },
+  
+  lockedCategory: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16 },
+  categoryDot: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
   categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 17, fontFamily: 'InstrumentSans_700Bold' },
-  categoryName: { fontSize: 11, color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontFamily: 'InstrumentSans_400Regular' },
-
-  numpadArea: { backgroundColor: 'rgba(255,255,255,0.05)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingBottom: 20, paddingTop: 10, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  lockedCategoryText: { fontSize: 16, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
+  
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 8 },
+  deleteText: { fontSize: 16, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' }
 });

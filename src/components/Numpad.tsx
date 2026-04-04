@@ -38,7 +38,7 @@ export default function Numpad({ onPress, onDelete, onSubmit, submitLabel = 'Don
       {onSubmit && (
         <TouchableOpacity
           onPress={onSubmit}
-          className="w-full bg-violet-500 py-4 mt-2 rounded-2xl items-center shadow-sm"
+          className="w-full bg-brand-500 py-4 mt-2 rounded-2xl items-center shadow-sm"
         >
           <Text className="text-white font-semibold text-xl">{submitLabel}</Text>
         </TouchableOpacity>

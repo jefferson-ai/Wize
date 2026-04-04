@@ -43,15 +43,29 @@ const CATEGORY_EMOJI_MAP: Record<string, string> = {
   maintenance: '🔧',
 
   // Income categories
-  salary: '💰',
+  'salary / wages': '💼',
+  'freelance / contract': '🧾',
+  'business revenue': '🏢',
+  'investments / dividends': '📈',
+  'rental income': '🏠',
+  'side hustle': '🚀',
+  'gift / allowance': '🎁',
+  'other income': '❓',
+  
+  // Aliases for income categories
+  salary: '💼',
+  wages: '💼',
+  freelance: '🧾',
+  contract: '🧾',
+  revenue: '🏢',
   investments: '📈',
-  freelance: '💼',
-  investment: '📈',
+  dividends: '📈',
+  rental: '🏠',
+  hustle: '🚀',
+  allowance: '🎁',
   bonus: '🎉',
   refund: '🔄',
-  rental: '🏘️',
   interest: '🏦',
-  dividends: '📊',
 };
 
 export function getCategoryEmoji(categoryName: string | null | undefined): string {

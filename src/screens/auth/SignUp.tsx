@@ -1,15 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthStackScreenProps } from '../../navigation/types';
 import { supabase } from '../../utils/supabase';
-import { Eye, EyeOff } from 'lucide-react-native';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { signInWithGoogle, configureGoogleSignIn } from '../../utils/googleAuth';
+import { useEffect } from 'react';
 
 export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignUp'>) {
+  const colors = useThemeColors();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
 
   const handleSignUp = async () => {
     if (!email || !password) {
@@ -18,7 +27,7 @@ export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignU
     }
     setLoading(true);
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
     });
     setLoading(false);
@@ -26,30 +35,42 @@ export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignU
       Alert.alert('Error', error.message);
     } else {
       Alert.alert(
-        'Success',
-        'Account created! You can now sign in.',
-        [{ text: 'OK', onPress: () => navigation.navigate('SignIn') }]
+        'Account Created',
+        'We sent a verification code to your email. Please verify your account to continue.',
+        [{ text: 'Verify', onPress: () => navigation.navigate('VerifyEmail', { email }) }]
       );
     }
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-zinc-950 px-6">
-      <View className="flex-1 justify-center">
-        <Text className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-          Create Account
-        </Text>
-        <Text className="text-zinc-500 dark:text-zinc-400 mb-8">
-          Start your journey to better finance today.
-        </Text>
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    const { error } = await signInWithGoogle();
+    setGoogleLoading(false);
+    if (error) {
+      if (error.code !== 'SIGN_IN_CANCELLED') {
+        Alert.alert('Google Sign-In Error', error.message);
+      }
+    }
+  };
 
-        <View className="space-y-4 mb-8">
-          <View>
-            <Text className="text-zinc-700 dark:text-zinc-300 mb-2 font-medium">Email</Text>
+  return (
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>Start your journey to better finance today.</Text>
+
+        <View style={styles.form}>
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Email</Text>
             <TextInput
-              className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 text-zinc-900 dark:text-zinc-50"
+              style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
               placeholder="you@example.com"
-              placeholderTextColor="#71717a"
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
@@ -57,53 +78,99 @@ export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignU
             />
           </View>
           
-          <View>
-            <Text className="text-zinc-700 dark:text-zinc-300 mb-2 font-medium">Password</Text>
-            <View className="relative justify-center">
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Password</Text>
+            <View style={styles.passwordContainer}>
               <TextInput
-                className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 pr-12 text-zinc-900 dark:text-zinc-50"
+                style={[styles.passwordInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
                 placeholder="••••••••"
-                placeholderTextColor="#71717a"
+                placeholderTextColor={colors.textMuted}
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
               />
               <TouchableOpacity 
-                className="absolute right-4" 
+                style={styles.eyeIcon} 
                 onPress={() => setShowPassword(!showPassword)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                {showPassword ? (
-                  <EyeOff size={20} color="#71717a" />
-                ) : (
-                  <Eye size={20} color="#71717a" />
-                )}
+                {showPassword ? <EyeOff size={20} color={colors.textMuted} /> : <Eye size={20} color={colors.textMuted} />}
               </TouchableOpacity>
             </View>
           </View>
         </View>
 
         <TouchableOpacity
-          className={`w-full bg-violet-500 py-4 rounded-xl items-center mb-4 flex-row justify-center ${loading ? 'opacity-70' : ''}`}
+          style={[styles.primaryButton, { backgroundColor: colors.text }, loading && styles.primaryButtonDisabled]}
           onPress={handleSignUp}
-          disabled={loading}
+          disabled={loading || googleLoading}
         >
-          {loading && <ActivityIndicator color="#fff" className="mr-2" />}
-          <Text className="text-white font-semibold text-lg">
-            Sign Up
-          </Text>
+          {loading && <ActivityIndicator color={colors.background} style={{ marginRight: 8 }} />}
+          <Text style={[styles.primaryButtonText, { color: colors.background }]}>Sign Up</Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider}>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerText, { color: colors.textMuted }]}>or</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.googleButton, { borderColor: colors.border }]}
+          onPress={handleGoogleSignIn}
+          disabled={loading || googleLoading}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color={colors.text} />
+          ) : (
+            <>
+              <View style={styles.googleIconPlaceholder}>
+                 <Text style={{ fontSize: 18, fontWeight: '700' }}>G</Text>
+              </View>
+              <Text style={[styles.googleButtonText, { color: colors.text }]}>Continue with Google</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          className="items-center"
+          style={styles.footerLink}
           onPress={() => navigation.navigate('SignIn')}
-          disabled={loading}
+          disabled={loading || googleLoading}
         >
-          <Text className="text-violet-600 dark:text-violet-400 font-medium">
-            Already have an account? Sign In
+          <Text style={[styles.footerLinkText, { color: colors.textMuted }]}>
+            Already have an account? <Text style={[styles.footerLinkTextBold, { color: colors.text }]}>Sign In</Text>
           </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#f5f6f7' },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
+  backButton: { width: 40, height: 40, justifyContent: 'center' },
+  container: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
+  title: { fontSize: 32, fontWeight: '700', color: '#212529', marginBottom: 8, fontFamily: 'InstrumentSans_700Bold' },
+  subtitle: { fontSize: 16, color: '#687280', marginBottom: 32, fontFamily: 'InstrumentSans_400Regular' },
+  form: { marginBottom: 32 },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 14, color: '#4a5568', marginBottom: 8, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
+  input: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#212529', fontFamily: 'InstrumentSans_400Regular' },
+  passwordContainer: { position: 'relative', justifyContent: 'center' },
+  passwordInput: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, paddingRight: 48, fontSize: 16, color: '#212529', fontFamily: 'InstrumentSans_400Regular' },
+  eyeIcon: { position: 'absolute', right: 16 },
+  primaryButton: { width: '100%', backgroundColor: '#212529', paddingVertical: 16, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginBottom: 16 },
+  primaryButtonDisabled: { opacity: 0.7 },
+  primaryButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16, fontFamily: 'InstrumentSans_600SemiBold' },
+  divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { marginHorizontal: 12, fontSize: 14, fontFamily: 'InstrumentSans_400Regular' },
+  googleButton: { width: '100%', paddingVertical: 16, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 24 },
+  googleIconPlaceholder: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  googleButtonText: { fontWeight: '600', fontSize: 16, fontFamily: 'InstrumentSans_600SemiBold' },
+  footerLink: { alignItems: 'center' },
+  footerLinkText: { color: '#687280', fontSize: 15, fontFamily: 'InstrumentSans_400Regular' },
+  footerLinkTextBold: { color: '#212529', fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+});
+

@@ -35,7 +35,7 @@ export default function BudgetSetupScreen({ navigation }: OnboardingStackScreenP
           <Text className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-4 uppercase tracking-wider">
             Target Amount
           </Text>
-          <View className="flex-row items-center border-b-2 border-violet-500 pb-2 px-4 shadow-sm">
+          <View className="flex-row items-center border-b-2 border-brand-500 pb-2 px-4 shadow-sm">
             <Text className="text-4xl font-semibold text-zinc-400 mr-2">
               {symbolMap[currency] || '$'}
             </Text>
@@ -53,7 +53,7 @@ export default function BudgetSetupScreen({ navigation }: OnboardingStackScreenP
 
         <View className="mt-auto py-4 space-y-4">
           <TouchableOpacity
-            className="w-full bg-violet-500 py-4 rounded-xl items-center"
+            className="w-full bg-brand-500 py-4 rounded-xl items-center"
             onPress={handleFinish}
           >
             <Text className="text-white font-semibold text-lg">Finish Setup</Text>

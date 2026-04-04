@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, FlatList, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert, Modal, FlatList, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { supabase } from '../utils/supabase';
-import { User, Moon, LogOut, Download, FileText, DollarSign, X } from 'lucide-react-native';
+import { User, Moon, LogOut, Download, FileText, DollarSign, X, ChevronRight, Database } from 'lucide-react-native';
 import { exportTransactionsToCSV } from '../features/export/exportService';
-import { seed6MonthsData } from '../utils/seedData';
+import { seed1YearStudentData } from '../utils/seedData';
+import { useThemeColors } from '../hooks/useThemeColors';
+import { db } from '../db';
+import { transactions, budgets, categories, savingGoals } from '../db/schema';
+import { eq } from 'drizzle-orm';
+import { Trash2, Loader2 } from 'lucide-react-native';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -27,6 +32,9 @@ export default function SettingsScreen({ navigation }: any) {
   const { user, setUser } = useAuthStore();
   const { theme, setTheme, currency, setCurrency } = useAppSettingsStore();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const colors = useThemeColors();
 
   const currentCurrency = CURRENCIES.find(c => c.code === currency || c.symbol === currency) || CURRENCIES[0];
 
@@ -35,7 +43,6 @@ export default function SettingsScreen({ navigation }: any) {
       await supabase.auth.signOut();
       setUser(null);
     } catch (error) {
-      console.error('Logout error', error);
       Alert.alert('Error', 'Failed to log out.');
     }
   };
@@ -48,104 +55,188 @@ export default function SettingsScreen({ navigation }: any) {
 
   const handleExport = async () => {
     if (!user?.id) return;
-    try {
-      await exportTransactionsToCSV(user.id);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to export data. Please try again.');
-    }
+    try { await exportTransactionsToCSV(user.id); }
+    catch { Alert.alert('Error', 'Failed to export data.'); }
   };
 
   const handleSeed = async () => {
     if (!user?.id) return;
+    setSeeding(true);
     try {
-      const count = await seed6MonthsData(user.id);
-      Alert.alert('Success', `Seeded ${count} transactions successfully! Pull to refresh your dashboard.`);
+      const count = await seed1YearStudentData(user.id);
+      Alert.alert('Success', `Generated ${count} test transactions covering 1 year!`);
+    } catch { Alert.alert('Error', 'Failed to generate seed data.'); }
+    finally { setSeeding(false); }
+  };
+  
+  const handleDeleteAccount = async () => {
+    if (!user?.id) return;
+    
+    Alert.alert(
+      'Wait! Export your data first?',
+      'Account deletion is permanent. Would you like to export your transactions to CSV before we wipe everything?',
+      [
+        { text: 'Export & Delete', onPress: async () => { await handleExport(); triggerDeleteFlow(); } },
+        { text: 'Just Delete', style: 'destructive', onPress: triggerDeleteFlow },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+  
+  const triggerDeleteFlow = () => {
+    Alert.alert(
+        'Final Confirmation',
+        'Are you absolutely sure? This will permanently erase all your transactions, budgets, and categories. This CANNOT be undone.',
+        [
+            { text: 'Delete Everywhere', style: 'destructive', onPress: performHardDelete },
+            { text: 'Cancel', style: 'cancel' }
+        ]
+    );
+  };
+  
+  const performHardDelete = async () => {
+    if (!user?.id) return;
+    setDeleting(true);
+    try {
+        // 1. Call custom RPC to delete user from auth.users (Supabase side)
+        const { error: rpcError } = await supabase.rpc('delete_user');
+        if (rpcError) throw rpcError;
+
+        // 2. Hard wipe local sequences
+        await db.delete(transactions).where(eq(transactions.userId, user.id));
+        await db.delete(budgets).where(eq(budgets.userId, user.id));
+        await db.delete(categories).where(eq(categories.userId, user.id));
+        await db.delete(savingGoals).where(eq(savingGoals.userId, user.id));
+        
+        // 3. Clear session and redirect
+        await supabase.auth.signOut();
+        setUser(null);
+        Alert.alert('Account Deleted', 'Your data has been successfully wiped and your account has been deactivated.');
     } catch (err) {
-      Alert.alert('Error', 'Failed to seed data.');
+        Alert.alert('Error', 'Failed to complete account deletion. Please ensure you have run the required SQL in your Supabase dashboard.');
+        console.error('Delete User Error:', err);
+    } finally {
+        setDeleting(false);
     }
   };
 
+  const themeLabel = theme === 'system' ? 'System' : theme === 'light' ? 'Light' : 'Dark';
+
   return (
-    <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-zinc-950" edges={['top']}>
-      <View className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex-row items-center">
-        <Text className="text-2xl font-black text-zinc-900 dark:text-zinc-50 tracking-tight">Settings</Text>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={styles.pageHeader}>
+        <Text style={[styles.pageTitle, { color: colors.text }]}>Account</Text>
       </View>
 
-      <ScrollView className="flex-1 pt-4">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 110 }}>
+        
         {/* Profile Card */}
-        <View className="bg-white dark:bg-zinc-900 p-4 mx-4 rounded-2xl mb-6 shadow-sm border border-zinc-100 dark:border-zinc-800 flex-row items-center">
-          <View className="w-12 h-12 rounded-full bg-violet-100 dark:bg-violet-900/40 items-center justify-center mr-4">
-            <User size={24} color="#600aff" />
+        <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.avatar, { backgroundColor: colors.background }]}>
+            <User size={26} color={colors.text} />
           </View>
-          <View className="flex-1">
-            <Text className="text-zinc-900 dark:text-white font-bold text-lg">{user?.email}</Text>
-            <Text className="text-zinc-500 text-sm">Pro Member</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.profileEmail, { color: colors.text }]} numberOfLines={1}>{user?.email}</Text>
+            <Text style={[styles.profileSub, { color: colors.textMuted }]}>Pro Member</Text>
           </View>
         </View>
 
         {/* Preferences */}
-        <Text className="px-6 text-sm font-bold text-zinc-500 uppercase tracking-wider mb-2" accessibilityRole="header">Preferences</Text>
-        <View className="bg-white dark:bg-zinc-900 mx-4 rounded-2xl mb-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
-          
-          <TouchableOpacity 
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Preferences</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
             onPress={cycleTheme}
             accessibilityRole="button"
-            accessibilityLabel={`Current theme is ${theme}. Double tap to change theme.`}
-            className="flex-row items-center justify-between p-4 border-b border-zinc-100 dark:border-zinc-800"
+            accessibilityLabel={`Current theme is ${theme}. Tap to change.`}
+            style={[styles.settingsRow, styles.settingsRowBorder, { borderBottomColor: colors.background }]}
           >
-            <View className="flex-row items-center">
-              <Moon size={20} color="#71717a" />
-              <Text className="text-zinc-900 dark:text-zinc-50 ml-3 font-medium text-base">Theme</Text>
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: colors.iconBg }]}>
+                <Moon size={17} color={colors.text} />
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.text }]}>Appearance</Text>
             </View>
-            <Text className="text-zinc-500 capitalize">{theme}</Text>
+            <View style={styles.settingsRight}>
+              <Text style={[styles.settingsValue, { color: colors.textMuted }]}>{themeLabel}</Text>
+              <ChevronRight size={16} color={colors.textMuted} />
+            </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => setShowCurrencyPicker(true)}
             accessibilityRole="button"
-            accessibilityLabel={`Current currency is ${currentCurrency.name}. Double tap to change.`}
-            className="flex-row items-center justify-between p-4"
+            accessibilityLabel={`Current currency is ${currentCurrency.name}. Tap to change.`}
+            style={styles.settingsRow}
           >
-            <View className="flex-row items-center">
-              <DollarSign size={20} color="#71717a" />
-              <Text className="text-zinc-900 dark:text-zinc-50 ml-3 font-medium text-base">Currency</Text>
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: '#f0f5ff' }]}>
+                <DollarSign size={17} color="#3b82f6" />
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.text }]}>Currency</Text>
             </View>
-            <Text className="text-zinc-500">{currentCurrency.symbol} {currentCurrency.code}</Text>
+            <View style={styles.settingsRight}>
+              <Text style={[styles.settingsValue, { color: colors.textMuted }]}>{currentCurrency.symbol} {currentCurrency.code}</Text>
+              <ChevronRight size={16} color={colors.textMuted} />
+            </View>
           </TouchableOpacity>
-
         </View>
 
-        {/* Data & Privacy */}
-        <Text className="px-6 text-sm font-bold text-zinc-500 uppercase tracking-wider mb-2" accessibilityRole="header">Data</Text>
-        <View className="bg-white dark:bg-zinc-900 mx-4 rounded-2xl mb-6 shadow-sm border border-zinc-100 dark:border-zinc-800">
-          <TouchableOpacity 
+        {/* Data */}
+        <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Data</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
             onPress={handleExport}
             accessibilityRole="button"
             accessibilityLabel="Export Transactions to CSV"
-            className="flex-row items-center p-4 border-b border-zinc-100 dark:border-zinc-800"
+            style={[styles.settingsRow, styles.settingsRowBorder, { borderBottomColor: colors.background }]}
           >
-            <Download size={20} color="#71717a" className="dark:text-zinc-400" />
-            <Text className="text-zinc-900 dark:text-zinc-50 ml-3 font-medium text-base">Export Data to CSV</Text>
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: colors.successBg }]}>
+                <Download size={17} color={colors.success} />
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.text }]}>Export to CSV</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={handleSeed}
-            className="flex-row items-center p-4"
-          >
-            <FileText size={20} color="#71717a" className="dark:text-zinc-400" />
-            <Text className="text-zinc-900 dark:text-zinc-50 ml-3 font-medium text-base">Seed 6 Months Data</Text>
+          <TouchableOpacity onPress={handleSeed} style={styles.settingsRow} disabled={seeding}>
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: colors.warningBg }]}>
+                <Database size={17} color={colors.warning} />
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.text }]}>
+                {seeding ? 'Generating mock data...' : 'Seed 1-Year Legon Data'}
+              </Text>
+            </View>
+            {!seeding && <ChevronRight size={16} color={colors.textMuted} />}
           </TouchableOpacity>
         </View>
 
-        {/* Danger Zone */}
-        <Text className="px-6 text-sm font-bold text-rose-500 uppercase tracking-wider mb-2">Account</Text>
-        <View className="bg-white dark:bg-zinc-900 mx-4 rounded-2xl mb-12 shadow-sm border border-rose-100 dark:border-rose-900/30">
-          <TouchableOpacity 
-            onPress={handleLogout}
-            className="flex-row items-center p-4"
-          >
-            <LogOut size={20} color="#ef4444" />
-            <Text className="text-rose-500 ml-3 font-bold text-base">Log Out</Text>
+        {/* Sign Out */}
+        <Text style={[styles.sectionLabel, { color: colors.danger }]}>Account</Text>
+        <View style={[styles.settingsGroup, { backgroundColor: colors.card }]}>
+          <TouchableOpacity onPress={handleLogout} style={[styles.settingsRow, styles.settingsRowBorder, { borderBottomColor: colors.background }]}>
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: colors.border }]}>
+                <LogOut size={17} color={colors.text} />
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.text }]}>Log Out</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={handleDeleteAccount} style={styles.settingsRow} disabled={deleting}>
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: colors.danger + '15' }]}>
+                {deleting ? (
+                  <Loader2 size={17} color={colors.danger} />
+                ) : (
+                  <Trash2 size={17} color={colors.danger} />
+                )}
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.danger }]}>
+                {deleting ? 'Deleting account...' : 'Delete Account'}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -153,20 +244,14 @@ export default function SettingsScreen({ navigation }: any) {
 
       {/* Currency Picker Modal */}
       <Modal visible={showCurrencyPicker} animationType="slide" transparent>
-        <Pressable 
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} 
-          onPress={() => setShowCurrencyPicker(false)}
-        >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowCurrencyPicker(false)}>
           <View style={{ flex: 1 }} />
-          <Pressable 
-            onPress={(e) => e.stopPropagation()}
-            className="bg-white dark:bg-zinc-900 rounded-t-3xl" 
-            style={{ maxHeight: '60%' }}
-          >
-            <View className="flex-row items-center justify-between p-5 border-b border-zinc-100 dark:border-zinc-800">
-              <Text className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Choose Currency</Text>
+          <Pressable onPress={(e) => e.stopPropagation()} style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+            <View style={[styles.modalHeader, { borderBottomColor: colors.background }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Currency</Text>
               <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
-                <X size={24} color="#71717a" />
+                <X size={22} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -176,28 +261,19 @@ export default function SettingsScreen({ navigation }: any) {
                 const isSelected = currentCurrency.code === item.code;
                 return (
                   <TouchableOpacity
-                    onPress={() => {
-                      setCurrency(item.code);
-                      setShowCurrencyPicker(false);
-                    }}
-                    className={`flex-row items-center px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 ${
-                      isSelected ? 'bg-violet-50 dark:bg-violet-900/20' : ''
-                    }`}
+                    onPress={() => { setCurrency(item.code); setShowCurrencyPicker(false); }}
+                    style={[styles.currencyRow, { borderBottomColor: colors.background }, isSelected && { backgroundColor: colors.background }]}
                   >
-                    <View className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center mr-4">
-                      <Text className="text-lg font-medium text-zinc-800 dark:text-zinc-200">{item.symbol}</Text>
+                    <View style={[styles.currencySymbolBadge, { backgroundColor: colors.background }]}>
+                      <Text style={[styles.currencySymbol, { color: colors.text }]}>{item.symbol}</Text>
                     </View>
-                    <View className="flex-1">
-                      <Text className={`text-base font-semibold ${isSelected ? 'text-violet-600 dark:text-violet-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
-                        {item.code}
-                      </Text>
-                      <Text className={`text-sm ${isSelected ? 'text-violet-500' : 'text-zinc-500'}`}>
-                        {item.name}
-                      </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.currencyCode, { color: colors.textMuted }, isSelected && { color: colors.text }]}>{item.code}</Text>
+                      <Text style={[styles.currencyName, { color: colors.textMuted }]}>{item.name}</Text>
                     </View>
                     {isSelected && (
-                      <View className="w-6 h-6 rounded-full bg-violet-500 items-center justify-center">
-                        <Text className="text-white text-xs font-bold">✓</Text>
+                      <View style={[styles.checkBadge, { backgroundColor: colors.text }]}>
+                        <Text style={{ color: colors.background, fontSize: 11, fontWeight: '700' }}>✓</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -210,3 +286,40 @@ export default function SettingsScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#f5f6f7' },
+
+  pageHeader: { paddingHorizontal: 24, paddingVertical: 16 },
+  pageTitle: { fontSize: 26, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+
+  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', marginHorizontal: 20, borderRadius: 20, padding: 16, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  avatar: { width: 52, height: 52, borderRadius: 18, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  profileEmail: { fontSize: 15, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+  profileSub: { fontSize: 12, color: '#9aa2ad', marginTop: 2, fontFamily: 'InstrumentSans_400Regular' },
+
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginHorizontal: 24, fontFamily: 'InstrumentSans_700Bold' },
+
+  settingsGroup: { backgroundColor: '#ffffff', marginHorizontal: 20, borderRadius: 20, marginBottom: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  settingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+  settingsRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f5f6f7' },
+  settingsLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingsIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  settingsLabel: { fontSize: 15, fontWeight: '500', color: '#212529', fontFamily: 'InstrumentSans_500Medium' },
+  settingsRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  settingsValue: { fontSize: 14, color: '#9aa2ad', fontFamily: 'InstrumentSans_400Regular' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalSheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '65%', paddingTop: 12 },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#e8eaec', alignSelf: 'center', marginBottom: 16 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#f5f6f7' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+
+  currencyRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f5f6f7' },
+  currencyRowActive: { backgroundColor: '#f5f6f7' },
+  currencySymbolBadge: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  currencySymbol: { fontSize: 17, fontWeight: '600', color: '#212529', fontFamily: 'InstrumentSans_600SemiBold' },
+  currencyCode: { fontSize: 15, fontWeight: '600', color: '#687280', fontFamily: 'InstrumentSans_600SemiBold' },
+  currencyName: { fontSize: 12, color: '#9aa2ad', marginTop: 1, fontFamily: 'InstrumentSans_400Regular' },
+  checkBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#212529', alignItems: 'center', justifyContent: 'center' },
+});

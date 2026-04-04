@@ -49,7 +49,7 @@ export default function CurrencySetupScreen({ navigation }: OnboardingStackScree
                 onPress={() => setSelectedCurrency(item.code)}
                 className={`flex-row items-center p-4 mb-3 rounded-2xl border ${
                   isSelected
-                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
+                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                     : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900'
                 }`}
               >
@@ -59,15 +59,15 @@ export default function CurrencySetupScreen({ navigation }: OnboardingStackScree
                   </Text>
                 </View>
                 <View className="flex-1">
-                  <Text className={`text-lg font-semibold ${isSelected ? 'text-violet-700 dark:text-violet-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                  <Text className={`text-lg font-semibold ${isSelected ? 'text-brand-700 dark:text-brand-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
                     {item.code}
                   </Text>
-                  <Text className={`text-sm ${isSelected ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                  <Text className={`text-sm ${isSelected ? 'text-brand-600 dark:text-brand-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
                     {item.name}
                   </Text>
                 </View>
                 {isSelected && (
-                  <View className="w-6 h-6 rounded-full bg-violet-500 items-center justify-center">
+                  <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center">
                     <Text className="text-white text-xs font-bold">✓</Text>
                   </View>
                 )}
@@ -78,7 +78,7 @@ export default function CurrencySetupScreen({ navigation }: OnboardingStackScree
 
         <View className="py-4">
           <TouchableOpacity
-            className="w-full bg-violet-500 py-4 rounded-xl items-center"
+            className="w-full bg-brand-500 py-4 rounded-xl items-center"
             onPress={handleNext}
           >
             <Text className="text-white font-semibold text-lg">Continue</Text>

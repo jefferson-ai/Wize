@@ -33,3 +33,13 @@ export const budgets = sqliteTable('budgets', {
   period: text('period', { enum: ['monthly', 'weekly'] }).notNull(),
   startDate: text('start_date').notNull(), // Stored as ISO string
 });
+
+export const savingGoals = sqliteTable('saving_goals', {
+  id: text('id').primaryKey(),
+  userId: text('user_id'),
+  name: text('name').notNull(),
+  targetAmount: real('target_amount').notNull(),
+  currentAmount: real('current_amount').default(0).notNull(),
+  icon: text('icon').notNull(),
+  color: text('color').notNull(),
+});

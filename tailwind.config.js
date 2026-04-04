@@ -8,18 +8,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        violet: {
-          50: '#f0e6ff',
-          100: '#d9c2ff',
-          200: '#b388ff',
-          300: '#9559ff',
-          400: '#7a33ff',
-          500: '#600aff',
-          600: '#5200e6',
-          700: '#4300bf',
-          800: '#340099',
-          900: '#250073',
+        brand: {
+          DEFAULT: '#212529',
+          50:  '#f5f6f7',
+          100: '#e8eaec',
+          200: '#c8cdd3',
+          300: '#9aa2ad',
+          400: '#687280',
+          500: '#212529',
+          600: '#1a1e22',
+          700: '#13171a',
+          800: '#0d1012',
+          900: '#07090a',
         },
+      },
+      fontFamily: {
+        sans: ['InstrumentSans_400Regular', 'InstrumentSans_600SemiBold', 'InstrumentSans_700Bold'],
       },
     },
   },

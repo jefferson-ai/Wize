@@ -4,10 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AppSettingsState {
   isOnboarded: boolean;
+  hasSeenWelcomeCarousel: boolean;
   currency: string;
   theme: 'light' | 'dark' | 'system';
   isOffline: boolean;
   setOnboarded: (val: boolean) => void;
+  setHasSeenWelcomeCarousel: (val: boolean) => void;
   setCurrency: (val: string) => void;
   setTheme: (val: 'light' | 'dark' | 'system') => void;
   setIsOffline: (status: boolean) => void;
@@ -17,10 +19,12 @@ export const useAppSettingsStore = create<AppSettingsState>()(
   persist(
     (set) => ({
       isOnboarded: false,
+      hasSeenWelcomeCarousel: false,
       currency: '$',
       theme: 'system',
       isOffline: false,
       setOnboarded: (val) => set({ isOnboarded: val }),
+      setHasSeenWelcomeCarousel: (val) => set({ hasSeenWelcomeCarousel: val }),
       setCurrency: (val) => set({ currency: val }),
       setTheme: (val) => set({ theme: val }),
       setIsOffline: (status) => set({ isOffline: status }),

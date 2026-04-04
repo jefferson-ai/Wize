@@ -9,6 +9,11 @@ import InsightsScreen from '../screens/Insights';
 import SettingsScreen from '../screens/Settings';
 import TransactionHistoryScreen from '../screens/TransactionHistory';
 import AddBudgetScreen from '../screens/AddBudget';
+import EditBudgetScreen from '../screens/EditBudget';
+import EditTransactionScreen from '../screens/EditTransaction';
+import NotificationsScreen from '../screens/Notifications';
+import SavingsGoalsScreen from '../screens/SavingsGoals';
+import AddSavingGoalScreen from '../screens/AddSavingGoal';
 
 import CustomTabBar from '../components/CustomTabBar';
 import { MainTabParamList } from './types';
@@ -40,7 +45,7 @@ function TabNavigator() {
           },
         })}
       />
-      <Tab.Screen name="Budgets" component={InsightsScreen} />
+      <Tab.Screen name="Planning" component={InsightsScreen} />
       <Tab.Screen name="Account" component={SettingsScreen} />
     </Tab.Navigator>
   );
@@ -55,7 +60,10 @@ export default function MainNavigator() {
       <AppStack.Screen
         name="AddTransaction"
         component={AddTransactionScreen}
-        options={{ presentation: 'modal' }}
+        options={{ 
+          presentation: 'transparentModal',
+          animation: 'slide_from_bottom' 
+        }}
       />
       <AppStack.Screen
         name="AddBudget"
@@ -63,8 +71,36 @@ export default function MainNavigator() {
         options={{ presentation: 'modal' }}
       />
       <AppStack.Screen
+        name="EditBudget"
+        component={EditBudgetScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <AppStack.Screen
         name="TransactionHistory"
         component={TransactionHistoryScreen}
+      />
+      <AppStack.Screen
+        name="EditTransaction"
+        component={EditTransactionScreen}
+        options={{
+          presentation: 'transparentModal',
+          animation: 'slide_from_bottom'
+        }}
+      />
+      <AppStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <AppStack.Screen
+        name="SavingsGoals"
+        component={SavingsGoalsScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <AppStack.Screen
+        name="AddSavingGoal"
+        component={AddSavingGoalScreen}
+        options={{ presentation: 'modal' }}
       />
     </AppStack.Navigator>
   );

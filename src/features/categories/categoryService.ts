@@ -7,26 +7,51 @@ import { syncData } from '../sync/syncService';
 // Use Expo Crypto for UUIDs on device
 const generateId = () => Crypto.randomUUID();
 
+// Muted, desaturated palette to match the app's charcoal (#212529) design system
+const MUTED = {
+  amber:    '#b5894e',
+  slate:    '#5c6b7a',
+  steel:    '#4a6580',
+  rose:     '#9e6068',
+  mauve:    '#7a6080',
+  dusty:    '#8a607a',
+  indigo:   '#5c5c8c',
+  teal:     '#4a7a80',
+  olive:    '#7a7a40',
+  stone:    '#6b6560',
+  terracotta: '#8c5e4a',
+  lavender: '#706080',
+  crimson:  '#884050',
+  charcoal: '#4a5568',
+  mist:     '#7a8896',
+};
+
 export const DEFAULT_CATEGORIES = [
   // Expenses (15 categories)
-  { name: 'Food & Dining', icon: 'utensils', color: '#f59e0b', type: 'expense' as const },
-  { name: 'Transport', icon: 'car', color: '#600aff', type: 'expense' as const },
-  { name: 'Housing & Rent', icon: 'home', color: '#3b82f6', type: 'expense' as const },
-  { name: 'Health & Medical', icon: 'heart', color: '#ef4444', type: 'expense' as const },
-  { name: 'Entertainment', icon: 'film', color: '#600aff', type: 'expense' as const },
-  { name: 'Shopping & Clothing', icon: 'shopping-bag', color: '#ec4899', type: 'expense' as const },
-  { name: 'Education', icon: 'book', color: '#6366f1', type: 'expense' as const },
-  { name: 'Travel', icon: 'plane', color: '#0ea5e9', type: 'expense' as const },
-  { name: 'Utilities', icon: 'lightbulb', color: '#eab308', type: 'expense' as const },
-  { name: 'Home Maintenance', icon: 'wrench', color: '#78716c', type: 'expense' as const },
-  { name: 'Fitness', icon: 'dumbbell', color: '#f97316', type: 'expense' as const },
-  { name: 'Pets', icon: 'paw', color: '#a855f7', type: 'expense' as const },
-  { name: 'Gifts & Donations', icon: 'gift', color: '#e11d48', type: 'expense' as const },
-  { name: 'Business', icon: 'briefcase', color: '#475569', type: 'expense' as const },
-  { name: 'Other', icon: 'more-horizontal', color: '#94a3b8', type: 'expense' as const },
+  { name: 'Food & Dining',       icon: 'utensils',       color: MUTED.amber,      type: 'expense' as const },
+  { name: 'Transport',           icon: 'car',            color: MUTED.slate,      type: 'expense' as const },
+  { name: 'Housing & Rent',      icon: 'home',           color: MUTED.steel,      type: 'expense' as const },
+  { name: 'Health & Medical',    icon: 'heart',          color: MUTED.rose,       type: 'expense' as const },
+  { name: 'Entertainment',       icon: 'film',           color: MUTED.mauve,      type: 'expense' as const },
+  { name: 'Shopping & Clothing', icon: 'shopping-bag',   color: MUTED.dusty,      type: 'expense' as const },
+  { name: 'Education',           icon: 'book',           color: MUTED.indigo,     type: 'expense' as const },
+  { name: 'Travel',              icon: 'plane',          color: MUTED.teal,       type: 'expense' as const },
+  { name: 'Utilities',           icon: 'lightbulb',      color: MUTED.olive,      type: 'expense' as const },
+  { name: 'Home Maintenance',    icon: 'wrench',         color: MUTED.stone,      type: 'expense' as const },
+  { name: 'Fitness',             icon: 'dumbbell',       color: MUTED.terracotta, type: 'expense' as const },
+  { name: 'Pets',                icon: 'paw',            color: MUTED.lavender,   type: 'expense' as const },
+  { name: 'Gifts & Donations',   icon: 'gift',           color: MUTED.crimson,    type: 'expense' as const },
+  { name: 'Business',            icon: 'briefcase',      color: MUTED.charcoal,   type: 'expense' as const },
+  { name: 'Other',               icon: 'more-horizontal',color: MUTED.mist,       type: 'expense' as const },
   // Income
-  { name: 'Salary', icon: 'briefcase', color: '#600aff', type: 'income' as const },
-  { name: 'Investments', icon: 'trending-up', color: '#3b82f6', type: 'income' as const },
+  { name: 'Salary / Wages',         icon: 'briefcase',   color: MUTED.teal,       type: 'income' as const },
+  { name: 'Freelance / Contract',    icon: 'file-text',   color: MUTED.steel,      type: 'income' as const },
+  { name: 'Business Revenue',        icon: 'briefcase',   color: MUTED.indigo,     type: 'income' as const },
+  { name: 'Investments / Dividends', icon: 'trending-up', color: MUTED.amber,      type: 'income' as const },
+  { name: 'Rental Income',           icon: 'home',        color: MUTED.dusty,      type: 'income' as const },
+  { name: 'Side Hustle',             icon: 'zap',         color: MUTED.lavender,   type: 'income' as const },
+  { name: 'Gift / Allowance',        icon: 'gift',        color: MUTED.rose,       type: 'income' as const },
+  { name: 'Other Income',            icon: 'more-horizontal', color: MUTED.mist,   type: 'income' as const },
 ];
 
 export async function seedDefaultCategories(userId: string) {
