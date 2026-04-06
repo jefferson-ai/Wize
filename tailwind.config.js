@@ -23,7 +23,9 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['InstrumentSans_400Regular', 'InstrumentSans_600SemiBold', 'InstrumentSans_700Bold'],
+        sans: ['"Helvetica Neue"', 'Helvetica', '-apple-system', '"system-ui"', '"Apple Color Emoji"', '"SF Pro"', '"SF Pro Icons"', 'Arial', 'sans-serif'],
+        display: ['"Helvetica Neue"', 'Helvetica', '-apple-system', '"system-ui"', '"Apple Color Emoji"', '"SF Pro"', '"SF Pro Icons"', 'Arial', 'sans-serif'],
+        rounded: ['"Helvetica Neue"', 'Helvetica', '-apple-system', '"system-ui"', '"Apple Color Emoji"', '"SF Pro"', '"SF Pro Icons"', 'Arial', 'sans-serif'],
       },
     },
   },

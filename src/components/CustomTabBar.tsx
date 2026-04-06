@@ -2,8 +2,9 @@ import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { Home, Wallet, Plus, LayoutGrid, User } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withSpring, withTiming, interpolate, Extrapolate } from 'react-native-reanimated';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { fontRounded } from '../theme/fonts';
 
 const TAB_ICONS: Record<string, any> = {
   Home: Home,
@@ -64,7 +65,8 @@ function AnimatedTabButton({ route, isFocused, onPress, onLayout, label, IconCom
   );
 }
 
-export default function CustomTabBar({ state, descriptors, navigation }: any) {
+export default function CustomTabBar({ state, descriptors, navigation, position: sharedPosition, onTabPress }: any) {
+  const position = sharedPosition; // Use the shared value we passed in
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
 
@@ -73,24 +75,47 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
   const bottomPadding = insets.bottom > 0 ? insets.bottom : 8;
 
   const onCenterPress = () => {
-    navigation.getParent()?.navigate('AddTransaction');
+    navigation.navigate('AddTransaction');
   };
 
   const indicatorStyle = useAnimatedStyle(() => {
-    const layout = tabLayouts[state.index];
-    if (!layout) {
+    // If we don't have layouts for all tabs yet, don't show the indicator
+    if (Object.keys(tabLayouts).length < state.routes.length || !position) {
       return { opacity: 0 };
     }
+
+    // Map scroll index (0-3) to tab slot index (0, 1, 3, 4)
+    // We only interpolate between the indices that have layouts AND are scrollable
+    const scrollIndices = [0, 1, 2, 3];
+    const visualSlotIndices = [0, 1, 3, 4];
+    
+    const xOutput = visualSlotIndices.map(i => tabLayouts[i]?.x ?? 0);
+    const widthOutput = visualSlotIndices.map(i => tabLayouts[i]?.width ?? 0);
+
+    const translateX = interpolate(
+      position.value,
+      scrollIndices,
+      xOutput,
+      Extrapolate.CLAMP
+    );
+
+    const width = interpolate(
+      position.value,
+      scrollIndices,
+      widthOutput,
+      Extrapolate.CLAMP
+    );
+
     return {
-      opacity: withTiming(1, { duration: 150 }),
-      width: withTiming(layout.width, { duration: 250 }),
-      height: withTiming(layout.height, { duration: 250 }),
+      opacity: 1,
+      width,
+      height: tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.height ?? 0,
       transform: [
-        { translateX: withTiming(layout.x, { duration: 250 }) },
-        { translateY: withTiming(layout.y, { duration: 250 }) }
+        { translateX },
+        { translateY: tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.y ?? 0 }
       ],
     };
-  }, [state.index, tabLayouts]);
+  }, [state.index, tabLayouts, position]);
 
   const renderTab = (route: any) => {
     const routeIndex = state.routes.indexOf(route);
@@ -99,13 +124,22 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
     const label = TAB_LABELS[route.name];
 
     const onPress = () => {
-      const event = navigation.emit({
-        type: 'tabPress',
-        target: route.key,
-        canPreventDefault: true,
-      });
-      if (!isFocused && !event.defaultPrevented) {
-        navigation.navigate(route.name);
+      if (route.name === 'AddTransaction') {
+        onCenterPress();
+        return;
+      }
+
+      if (onTabPress) {
+        onTabPress(routeIndex);
+      } else {
+        const event = navigation.emit({
+          type: 'tabPress',
+          target: route.key,
+          canPreventDefault: true,
+        });
+        if (!isFocused && !event.defaultPrevented) {
+          navigation.navigate(route.name);
+        }
       }
     };
 
@@ -197,7 +231,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 8,
     borderRadius: 30,
-    shadowColor: '#212529',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
@@ -215,11 +249,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 3,
     fontWeight: '500',
-    fontFamily: 'InstrumentSans_500Medium',
+    fontFamily: fontRounded,
   },
   labelActive: {
     fontWeight: '700',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontRounded,
   },
   centerSpacer: {
     width: 72,
@@ -230,7 +264,7 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#212529',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 10,

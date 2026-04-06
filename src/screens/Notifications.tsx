@@ -4,6 +4,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { X, Bell, Flame, Wallet, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatAmount } from '../utils/formatters';
+import { fontText } from '../theme/fonts';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -58,7 +59,7 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const renderRightActions = (id: string) => (
-    <View style={styles.deleteAction}>
+    <View style={[styles.deleteAction, { backgroundColor: colors.dangerBg }]}>
       <Trash2 size={20} color={colors.danger} />
     </View>
   );
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
   },
   closeBtn: {
     width: 34,
@@ -180,21 +181,21 @@ const styles = StyleSheet.create({
   notifTitle: {
     fontSize: 15,
     fontWeight: '700',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
     flex: 1,
     marginRight: 8,
   },
   timeText: {
     fontSize: 11,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
   notifBody: {
     fontSize: 13,
     lineHeight: 18,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
   deleteAction: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     width: 80,
@@ -213,7 +214,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
     marginTop: 16,
     marginBottom: 8,
   },
@@ -221,6 +222,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
 });

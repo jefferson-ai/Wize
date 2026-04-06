@@ -8,12 +8,13 @@ import { createBudget } from '../features/budgets/budgetService';
 import { getCategories } from '../features/categories/categoryService';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
+import { fontDisplay, fontText } from '../theme/fonts';
 
 export default function AddBudgetScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
   const colors = useThemeColors();
-  
+
   const [amountStr, setAmountStr] = useState('0');
   const [period, setPeriod] = useState<'monthly' | 'weekly'>('monthly');
   const [categories, setCategories] = useState<any[]>([]);
@@ -141,33 +142,33 @@ export default function AddBudgetScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#212529' },
+  screen: { flex: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   closeBtn: { padding: 8 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#ffffff', fontFamily: 'InstrumentSans_700Bold' },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: '#ffffff', fontFamily: fontDisplay },
   saveBtn: { padding: 8 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#f5f6f7', fontFamily: 'InstrumentSans_700Bold' },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#f5f6f7', fontFamily: fontText },
 
   amountArea: { alignItems: 'center', paddingVertical: 32 },
-  amountLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12, fontFamily: 'InstrumentSans_600SemiBold' },
+  amountLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12, fontFamily: fontText },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },
-  currencyText: { fontSize: 30, fontWeight: '700', color: 'rgba(255,255,255,0.4)', marginRight: 4, fontFamily: 'InstrumentSans_700Bold' },
-  amountText: { fontSize: 56, fontWeight: '700', color: '#ffffff', letterSpacing: -1, fontFamily: 'InstrumentSans_700Bold', minWidth: 60 } as any,
+  currencyText: { fontSize: 30, fontWeight: '700', color: 'rgba(255,255,255,0.4)', marginRight: 4, fontFamily: fontDisplay },
+  amountText: { fontSize: 56, fontWeight: '700', color: '#ffffff', letterSpacing: -1, fontFamily: fontDisplay, minWidth: 60 } as any,
 
   periodToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18, padding: 4, marginBottom: 28 },
   periodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 14 },
   periodBtnActive: { backgroundColor: '#ffffff' },
-  periodBtnText: { fontWeight: '600', color: '#9aa2ad', fontSize: 14, fontFamily: 'InstrumentSans_600SemiBold' },
+  periodBtnText: { fontWeight: '600', color: '#9aa2ad', fontSize: 14, fontFamily: fontText },
   periodBtnTextActive: { color: '#212529' },
 
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: 'InstrumentSans_700Bold' },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: fontText },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 20 },
   categoryItem: { alignItems: 'center', width: 60 },
   categoryDot: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   categoryDotSelected: { borderWidth: 3, borderColor: '#ffffff' },
-  categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 17, fontFamily: 'InstrumentSans_700Bold' },
-  categoryName: { fontSize: 11, color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontFamily: 'InstrumentSans_400Regular' },
+  categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 17, fontFamily: fontText },
+  categoryName: { fontSize: 11, color: 'rgba(255,255,255,0.6)', textAlign: 'center', fontFamily: fontDisplay },
 
   numpadArea: { backgroundColor: 'rgba(255,255,255,0.05)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingBottom: 20, paddingTop: 10, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
 });

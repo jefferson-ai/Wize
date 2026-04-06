@@ -5,6 +5,7 @@ import { AuthStackScreenProps } from '../../navigation/types';
 import { supabase } from '../../utils/supabase';
 import { ArrowLeft } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { fontDisplay, fontText } from '../../theme/fonts';
 
 export default function VerifyEmailScreen({ navigation, route }: AuthStackScreenProps<'VerifyEmail'>) {
   const colors = useThemeColors();
@@ -102,21 +103,21 @@ export default function VerifyEmailScreen({ navigation, route }: AuthStackScreen
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f5f6f7' },
+  safeArea: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
   backButton: { width: 40, height: 40, justifyContent: 'center' },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
-  title: { fontSize: 32, fontWeight: '700', color: '#212529', marginBottom: 8, fontFamily: 'InstrumentSans_700Bold' },
-  subtitle: { fontSize: 16, color: '#687280', marginBottom: 32, fontFamily: 'InstrumentSans_400Regular', lineHeight: 24 },
-  highlight: { fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+  title: { fontSize: 32, fontWeight: '700', color: '#212529', marginBottom: 8, fontFamily: fontDisplay },
+  subtitle: { fontSize: 16, color: '#687280', marginBottom: 32, fontFamily: fontText, lineHeight: 24 },
+  highlight: { fontWeight: '700', color: '#212529', fontFamily: fontText },
   form: { marginBottom: 32 },
   inputGroup: { marginBottom: 20 },
-  label: { fontSize: 14, color: '#4a5568', marginBottom: 8, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  input: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 24, letterSpacing: 4, textAlign: 'center', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+  label: { fontSize: 14, color: '#4a5568', marginBottom: 8, fontWeight: '600', fontFamily: fontText },
+  input: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 24, letterSpacing: 4, textAlign: 'center', color: '#212529', fontFamily: fontDisplay },
   primaryButton: { width: '100%', backgroundColor: '#212529', paddingVertical: 16, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginBottom: 24 },
   disabledButton: { opacity: 0.7 },
-  primaryButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16, fontFamily: 'InstrumentSans_600SemiBold' },
+  primaryButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16, fontFamily: fontText },
   resendLink: { alignItems: 'center' },
-  resendLinkText: { color: '#687280', fontSize: 15, fontFamily: 'InstrumentSans_400Regular' },
-  resendLinkTextBold: { color: '#212529', fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  resendLinkText: { color: '#687280', fontSize: 15, fontFamily: fontText },
+  resendLinkTextBold: { color: '#212529', fontWeight: '700', fontFamily: fontText },
 });

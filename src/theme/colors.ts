@@ -16,6 +16,14 @@ export const LightTheme = {
   iconDefault: '#212529',
   tabBarBg: '#ffffff',
   tabBarBorder: '#f5f6f7',
+  handle: '#e8eaec',
+  overlay: 'rgba(0,0,0,0.45)',
+  // Accent icon backgrounds (light tints)
+  accentRedBg: '#fdf2f2',
+  accentBlueBg: '#f0f5ff',
+  accentYellowBg: '#fef9c3',
+  accentCalendarBg: '#eff6ff',
+  accentGreenBg: '#f0fdf4',
   isDark: false,
 };
 
@@ -37,6 +45,14 @@ export const DarkTheme = {
   iconDefault: '#ffffff',
   tabBarBg: '#0f1214',
   tabBarBorder: '#212529',
+  handle: '#2a2f33',
+  overlay: 'rgba(0,0,0,0.6)',
+  // Accent icon backgrounds (dark-safe alpha tints)
+  accentRedBg: 'rgba(239, 68, 68, 0.12)',
+  accentBlueBg: 'rgba(59, 130, 246, 0.12)',
+  accentYellowBg: 'rgba(202, 138, 4, 0.12)',
+  accentCalendarBg: 'rgba(59, 130, 246, 0.12)',
+  accentGreenBg: 'rgba(34, 197, 94, 0.1)',
   isDark: true,
 };
 

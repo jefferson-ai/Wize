@@ -1,10 +1,13 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Account } from '../features/accounts/accountService';
 
 export type RootStackParamList = {
   Splash: undefined;
   Auth: undefined;
   Onboarding: undefined;
   Main: undefined;
+  AccountsList: undefined;
+  AddAccount: { account?: Account };
 };
 
 export type AuthStackParamList = {
@@ -15,8 +18,10 @@ export type AuthStackParamList = {
 };
 
 export type OnboardingStackParamList = {
+  FeatureIntro: undefined;
   CurrencySetup: undefined;
-  BudgetSetup: undefined;
+  AccountSetup: undefined;
+  FinancialGoalsSetup: undefined;
 };
 
 export type MainTabParamList = {

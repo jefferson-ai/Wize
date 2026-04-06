@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { Flame } from 'lucide-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
 export const STREAK_MILESTONES = [
   { days: 3, color: '#FFB800' }, // Amber
@@ -91,8 +92,8 @@ export default function StreakBadges({ streak, isVisible, onClose }: { streak: n
              })}
           </View>
 
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-             <Text style={styles.closeBtnText}>Awesome!</Text>
+          <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.text }]} onPress={onClose}>
+             <Text style={[styles.closeBtnText, { color: colors.background }]}>Awesome!</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -104,21 +105,21 @@ const styles = StyleSheet.create({
   badgesContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderRadius: 20, borderWidth: 1 },
   badgeWrapper: { alignItems: 'center' },
   flameContainer: { marginBottom: 6, height: 28, justifyContent: 'center' },
-  badgeText: { fontSize: 12, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  badgeText: { fontSize: 12, fontWeight: '700', fontFamily: fontRounded },
   badgeLine: { flex: 1, height: 2, marginHorizontal: 4, borderRadius: 1, opacity: 0.5 },
   
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', borderRadius: 24, padding: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-  modalTitle: { fontSize: 20, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold', marginBottom: 20, textAlign: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: '700', fontFamily: fontDisplay, marginBottom: 20, textAlign: 'center' },
   currentStreakCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, marginBottom: 20 },
   largeFlameContainer: { width: 64, height: 64, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  currentStreakNum: { fontSize: 22, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold', marginBottom: 2 },
-  currentStreakLabel: { fontSize: 13, fontFamily: 'InstrumentSans_400Regular' },
+  currentStreakNum: { fontSize: 22, fontWeight: '700', fontFamily: fontDisplay, marginBottom: 2 },
+  currentStreakLabel: { fontSize: 13, fontFamily: fontText },
   insightList: { marginBottom: 24 },
-  insightRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.04)' },
-  insightRowText: { flex: 1, marginLeft: 12, fontSize: 15, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  insightRowStatus: { fontSize: 13, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  closeBtn: { paddingVertical: 16, backgroundColor: '#212529', borderRadius: 100, alignItems: 'center' },
-  closeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  insightRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(128,128,128,0.1)' },
+  insightRowText: { flex: 1, marginLeft: 12, fontSize: 15, fontWeight: '600', fontFamily: fontText },
+  insightRowStatus: { fontSize: 13, fontWeight: '600', fontFamily: fontText },
+  closeBtn: { paddingVertical: 16, borderRadius: 100, alignItems: 'center' },
+  closeBtnText: { fontSize: 16, fontWeight: '700', fontFamily: fontDisplay },
 });

@@ -7,6 +7,7 @@ import { useAppSettingsStore } from '../store/appSettingsStore';
 import { updateBudget, deleteBudget } from '../features/budgets/budgetService';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
+import { fontDisplay, fontText } from '../theme/fonts';
 
 export default function EditBudgetScreen({ navigation, route }: any) {
   const { user } = useAuthStore();
@@ -146,31 +147,31 @@ export default function EditBudgetScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#212529' },
+  screen: { flex: 1 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   closeBtn: { padding: 8 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#ffffff', fontFamily: 'InstrumentSans_700Bold' },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: '#ffffff', fontFamily: fontDisplay },
   saveBtn: { padding: 8 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#f5f6f7', fontFamily: 'InstrumentSans_700Bold' },
+  saveBtnText: { fontSize: 16, fontWeight: '700', color: '#f5f6f7', fontFamily: fontText },
 
   amountArea: { alignItems: 'center', paddingVertical: 32 },
-  amountLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12, fontFamily: 'InstrumentSans_600SemiBold' },
+  amountLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12, fontFamily: fontText },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },
-  currencyText: { fontSize: 30, fontWeight: '700', color: 'rgba(255,255,255,0.4)', marginRight: 4, fontFamily: 'InstrumentSans_700Bold' },
-  amountText: { fontSize: 56, fontWeight: '700', color: '#ffffff', letterSpacing: -1, fontFamily: 'InstrumentSans_700Bold', minWidth: 60 } as any,
+  currencyText: { fontSize: 30, fontWeight: '700', color: 'rgba(255,255,255,0.4)', marginRight: 4, fontFamily: fontDisplay },
+  amountText: { fontSize: 56, fontWeight: '700', color: '#ffffff', letterSpacing: -1, fontFamily: fontDisplay, minWidth: 60 } as any,
 
   periodToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 18, padding: 4, marginBottom: 28 },
   periodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 14 },
-  periodBtnText: { fontWeight: '600', color: '#9aa2ad', fontSize: 14, fontFamily: 'InstrumentSans_600SemiBold' },
+  periodBtnText: { fontWeight: '600', color: '#9aa2ad', fontSize: 14, fontFamily: fontText },
 
-  sectionLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: 'InstrumentSans_700Bold' },
+  sectionLabel: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: fontText },
   
   lockedCategory: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16 },
   categoryDot: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 17, fontFamily: 'InstrumentSans_700Bold' },
-  lockedCategoryText: { fontSize: 16, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
+  categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 17, fontFamily: fontText },
+  lockedCategoryText: { fontSize: 16, fontWeight: '600', fontFamily: fontText },
   
   deleteBtn: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 8 },
-  deleteText: { fontSize: 16, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' }
+  deleteText: { fontSize: 16, fontWeight: '600', fontFamily: fontText }
 });

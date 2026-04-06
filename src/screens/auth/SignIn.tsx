@@ -6,7 +6,9 @@ import { supabase } from '../../utils/supabase';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { signInWithGoogle, configureGoogleSignIn } from '../../utils/googleAuth';
+import GoogleIcon from '../../components/GoogleIcon';
 import { useEffect } from 'react';
+import { fontDisplay, fontText } from '../../theme/fonts';
 
 export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignIn'>) {
   const colors = useThemeColors();
@@ -130,7 +132,7 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
           ) : (
             <>
               <View style={styles.googleIconPlaceholder}>
-                 <Text style={{ fontSize: 18, fontWeight: '700' }}>G</Text>
+                 <GoogleIcon size={20} />
               </View>
               <Text style={[styles.googleButtonText, { color: colors.text }]}>Continue with Google</Text>
             </>
@@ -152,29 +154,29 @@ export default function SignInScreen({ navigation }: AuthStackScreenProps<'SignI
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f5f6f7' },
+  safeArea: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
   backButton: { width: 40, height: 40, justifyContent: 'center' },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
-  title: { fontSize: 32, fontWeight: '700', color: '#212529', marginBottom: 8, fontFamily: 'InstrumentSans_700Bold' },
-  subtitle: { fontSize: 16, color: '#687280', marginBottom: 32, fontFamily: 'InstrumentSans_400Regular' },
+  title: { fontSize: 32, fontWeight: '700', color: '#212529', marginBottom: 8, fontFamily: fontDisplay },
+  subtitle: { fontSize: 16, color: '#687280', marginBottom: 32, fontFamily: fontText },
   form: { marginBottom: 32 },
   inputGroup: { marginBottom: 20 },
-  label: { fontSize: 14, color: '#4a5568', marginBottom: 8, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  input: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#212529', fontFamily: 'InstrumentSans_400Regular' },
+  label: { fontSize: 14, color: '#4a5568', marginBottom: 8, fontWeight: '600', fontFamily: fontText },
+  input: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, color: '#212529', fontFamily: fontText },
   passwordContainer: { position: 'relative', justifyContent: 'center' },
-  passwordInput: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, paddingRight: 48, fontSize: 16, color: '#212529', fontFamily: 'InstrumentSans_400Regular' },
+  passwordInput: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14, paddingRight: 48, fontSize: 16, color: '#212529', fontFamily: fontText },
   eyeIcon: { position: 'absolute', right: 16 },
   primaryButton: { width: '100%', backgroundColor: '#212529', paddingVertical: 16, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginBottom: 16 },
   primaryButtonDisabled: { opacity: 0.7 },
-  primaryButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16, fontFamily: 'InstrumentSans_600SemiBold' },
+  primaryButtonText: { color: '#ffffff', fontWeight: '600', fontSize: 16, fontFamily: fontText },
   divider: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   dividerLine: { flex: 1, height: 1 },
-  dividerText: { marginHorizontal: 12, fontSize: 14, fontFamily: 'InstrumentSans_400Regular' },
+  dividerText: { marginHorizontal: 12, fontSize: 14, fontFamily: fontText },
   googleButton: { width: '100%', paddingVertical: 16, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginBottom: 24 },
   googleIconPlaceholder: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  googleButtonText: { fontWeight: '600', fontSize: 16, fontFamily: 'InstrumentSans_600SemiBold' },
+  googleButtonText: { fontWeight: '600', fontSize: 16, fontFamily: fontText },
   footerLink: { alignItems: 'center' },
-  footerLinkText: { color: '#687280', fontSize: 15, fontFamily: 'InstrumentSans_400Regular' },
-  footerLinkTextBold: { color: '#212529', fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  footerLinkText: { color: '#687280', fontSize: 15, fontFamily: fontText },
+  footerLinkTextBold: { color: '#212529', fontWeight: '700', fontFamily: fontText },
 });

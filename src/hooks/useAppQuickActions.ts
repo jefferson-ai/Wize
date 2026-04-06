@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import * as QuickActions from 'expo-quick-actions';
 import { Platform } from 'react-native';
 import { navigateNested } from '../navigation/navigationRef';
+import { useAuthStore } from '../store/authStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 
 export function useAppQuickActions() {
   useEffect(() => {
@@ -49,6 +51,12 @@ export function useAppQuickActions() {
   }, []);
 
   const handleAction = (action: QuickActions.Action) => {
+    const { session } = useAuthStore.getState();
+    const { isOnboarded } = useAppSettingsStore.getState();
+
+    // Only allow jumping to transactions if we're fully logged in and onboarded
+    if (!session || !isOnboarded) return;
+
     if (action.id === 'add_expense') {
       navigateNested('Main', 'AddTransaction', { initialType: 'expense' });
     } else if (action.id === 'add_income') {

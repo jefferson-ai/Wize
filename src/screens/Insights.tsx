@@ -15,12 +15,17 @@ import StreakBadges, { getStreakColor } from '../components/StreakBadges';
 import Confetti, { ConfettiRef } from '../components/Confetti';
 import SavingBucket from '../components/SavingBucket';
 import { useFocusEffect } from '@react-navigation/native';
+import AIAdvisorModal from '../components/AIAdvisorModal';
+import { HeaderRegistrar } from '../components/AnimatedHeader';
+import { useTabHeaderInset } from '../navigation/tabHeaderInset';
+import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
 const { width } = Dimensions.get('window');
 
 export default function InsightsScreen({ navigation, route }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
+  const headerInset = useTabHeaderInset();
 
   const [activeTab, setActiveTab] = useState<'budgets' | 'savings'>(route?.params?.initialTab || 'budgets');
   const [budgets, setBudgets] = useState<any[]>([]);
@@ -29,6 +34,7 @@ export default function InsightsScreen({ navigation, route }: any) {
   const [streak, setStreak] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
   const colors = useThemeColors();
 
   const confettiRef = React.useRef<ConfettiRef>(null);
@@ -216,32 +222,11 @@ export default function InsightsScreen({ navigation, route }: any) {
   );
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={styles.pageHeader}>
-        <Text style={[styles.pageTitle, { color: colors.text }]} accessibilityRole="header">Planning</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <View style={{ zIndex: 100 }}>
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              onPress={() => setStreakModalVisible(true)}
-              style={[
-                styles.streakBadge, 
-                streak === 0 ? { opacity: 0.5, backgroundColor: colors.border } : { 
-                  backgroundColor: getStreakColor(streak, colors.border) + '15',
-                  borderColor: getStreakColor(streak, colors.border)
-                }
-              ]}
-            >
-              <Text style={[
-                styles.streakText, 
-                streak === 0 ? { color: colors.textMuted } : { color: getStreakColor(streak, colors.border) }
-              ]}>
-                {streak} 🔥
-              </Text>
-            </TouchableOpacity>
-            <Confetti ref={confettiRef} />
-          </View>
+    <View style={[styles.screen, { flex: 1, backgroundColor: 'transparent' }]}>
+      <HeaderRegistrar 
+        title="Planning" 
+        index={2}
+        rightElement={
           <TouchableOpacity
             onPress={handleAddAction}
             accessibilityRole="button"
@@ -250,7 +235,32 @@ export default function InsightsScreen({ navigation, route }: any) {
           >
             <Plus size={20} color={colors.background} strokeWidth={2.5} />
           </TouchableOpacity>
-        </View>
+        }
+      />
+
+      <View style={{ height: headerInset }} collapsable={false} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* AI Strategist Entry */}
+      <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setAiModalVisible(true)}
+          style={[styles.aiCard, { backgroundColor: colors.text, shadowColor: colors.text }]}
+        >
+          <View style={styles.aiCardContent}>
+            <View style={styles.aiTextContainer}>
+              <View style={styles.aiBadge}>
+                <Sparkles size={12} color={colors.background} style={{ marginRight: 4 }} />
+                <Text style={[styles.aiBadgeText, { color: colors.background }]}>AI Strategy</Text>
+              </View>
+              <Text style={[styles.aiTitle, { color: colors.background }]}>Unlock Financial Insights</Text>
+              <Text style={[styles.aiSubtitle, { color: colors.background, opacity: 0.7 }]}>Let your AI strategist analyze your habits</Text>
+            </View>
+            <View style={[styles.aiIconCircle, { backgroundColor: colors.background + '20' }]}>
+              <Sparkles size={24} color={colors.background} />
+            </View>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Segmented Control */}
@@ -303,73 +313,87 @@ export default function InsightsScreen({ navigation, route }: any) {
           renderSavingsView()
         )}
       </ScrollView>
+      </View>
 
       <StreakBadges 
         streak={streak} 
         isVisible={streakModalVisible} 
         onClose={() => setStreakModalVisible(false)} 
       />
-    </SafeAreaView>
+      <AIAdvisorModal 
+        isVisible={aiModalVisible} 
+        onClose={() => setAiModalVisible(false)} 
+        userId={user?.id || ''} 
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f5f6f7' },
+  aiCard: { borderRadius: 24, padding: 20, elevation: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 },
+  aiCardContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  aiTextContainer: { flex: 1 },
+  aiBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginBottom: 8 },
+  aiBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: fontRounded },
+  aiTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4, fontFamily: fontDisplay },
+  aiSubtitle: { fontSize: 13, fontFamily: fontText },
+  aiIconCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  screen: { flex: 1 },
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16 },
-  pageTitle: { fontSize: 26, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+  pageTitle: { fontSize: 26, fontWeight: '700', color: '#212529', fontFamily: fontDisplay },
   addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#212529', alignItems: 'center', justifyContent: 'center' },
 
   tabsWrapper: { paddingHorizontal: 24, marginBottom: 8 },
   tabsContainer: { flexDirection: 'row', borderRadius: 16, padding: 4 },
   tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
-  tabText: { fontSize: 13, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  tabText: { fontSize: 13, fontWeight: '700', fontFamily: fontRounded },
 
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 14, fontFamily: 'InstrumentSans_700Bold' },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 14, fontFamily: fontRounded },
   budgetCard: { backgroundColor: '#ffffff', borderRadius: 20, padding: 18, marginBottom: 14 },
   budgetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   budgetLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   categoryDot: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 15, fontFamily: 'InstrumentSans_700Bold' },
-  categoryName: { fontSize: 16, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
-  budgetPeriod: { fontSize: 12, color: '#9aa2ad', marginTop: 1, fontFamily: 'InstrumentSans_400Regular' },
+  categoryDotText: { color: '#ffffff', fontWeight: '700', fontSize: 15, fontFamily: fontText },
+  categoryName: { fontSize: 16, fontWeight: '700', color: '#212529', fontFamily: fontDisplay },
+  budgetPeriod: { fontSize: 12, color: '#9aa2ad', marginTop: 1, fontFamily: fontText },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusText: { fontSize: 11, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  statusText: { fontSize: 11, fontWeight: '700', fontFamily: fontText },
 
   amountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
-  amountLabel: { fontSize: 12, color: '#9aa2ad', marginBottom: 3, fontFamily: 'InstrumentSans_400Regular' },
-  amountValue: { fontSize: 20, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
-  amountLimit: { fontSize: 15, fontWeight: '600', color: '#687280', fontFamily: 'InstrumentSans_600SemiBold' },
+  amountLabel: { fontSize: 12, color: '#9aa2ad', marginBottom: 3, fontFamily: fontText },
+  amountValue: { fontSize: 20, fontWeight: '700', color: '#212529', fontFamily: fontDisplay },
+  amountLimit: { fontSize: 15, fontWeight: '600', color: '#687280', fontFamily: fontText },
 
   progressTrack: { height: 6, backgroundColor: '#f5f6f7', borderRadius: 6, overflow: 'hidden', marginBottom: 8 },
   progressFill: { height: '100%', borderRadius: 6 },
   progressFooter: { flexDirection: 'row', justifyContent: 'space-between' },
-  progressPct: { fontSize: 11, color: '#9aa2ad', fontFamily: 'InstrumentSans_400Regular' },
-  progressStatus: { fontSize: 11, fontWeight: '600', color: '#9aa2ad', fontFamily: 'InstrumentSans_600SemiBold' },
+  progressPct: { fontSize: 11, color: '#9aa2ad', fontFamily: fontText },
+  progressStatus: { fontSize: 11, fontWeight: '600', color: '#9aa2ad', fontFamily: fontText },
 
   strategiesContainer: { flexDirection: 'row', gap: 12, marginBottom: 16 },
   strategyCard: { flex: 1, padding: 16, borderRadius: 24, borderWidth: 1 },
   strategyIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  strategyLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, fontFamily: 'InstrumentSans_700Bold' },
-  strategyAmount: { fontSize: 18, fontWeight: '800', marginBottom: 4, fontFamily: 'InstrumentSans_700Bold' },
-  strategyDetail: { fontSize: 9, fontFamily: 'InstrumentSans_400Regular' },
+  strategyLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, fontFamily: fontText },
+  strategyAmount: { fontSize: 18, fontWeight: '800', marginBottom: 4, fontFamily: fontDisplay },
+  strategyDetail: { fontSize: 9, fontFamily: fontText },
 
   statBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, marginBottom: 20, gap: 8 },
-  statText: { fontSize: 11, fontFamily: 'InstrumentSans_400Regular' },
+  statText: { fontSize: 11, fontFamily: fontText },
 
   goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   goalCard: { width: (width - 56) / 2, padding: 20, borderRadius: 24, marginBottom: 16, alignItems: 'center' },
   goalInfo: { marginTop: 12, alignItems: 'center' },
-  goalName: { fontSize: 14, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold', textAlign: 'center' },
-  goalTargetText: { fontSize: 11, marginTop: 2, fontFamily: 'InstrumentSans_400Regular' },
+  goalName: { fontSize: 14, fontWeight: '700', fontFamily: fontText, textAlign: 'center' },
+  goalTargetText: { fontSize: 11, marginTop: 2, fontFamily: fontText },
 
   emptyState: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 30 },
   emptyGoals: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 20, borderRadius: 28 },
   emptyIcon: { width: 72, height: 72, borderRadius: 24, backgroundColor: '#e8eaec', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#212529', marginBottom: 8, textAlign: 'center', fontFamily: 'InstrumentSans_700Bold' },
-  emptyBody: { fontSize: 13, color: '#9aa2ad', textAlign: 'center', lineHeight: 20, fontFamily: 'InstrumentSans_400Regular' },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#212529', marginBottom: 8, textAlign: 'center', fontFamily: fontDisplay },
+  emptyBody: { fontSize: 13, color: '#9aa2ad', textAlign: 'center', lineHeight: 20, fontFamily: fontText },
   emptyBtn: { backgroundColor: '#212529', paddingHorizontal: 24, paddingVertical: 14, borderRadius: 28 },
-  emptyBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 15, fontFamily: 'InstrumentSans_700Bold' },
+  emptyBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 15, fontFamily: fontText },
   
   streakBadge: { backgroundColor: '#fff3cd', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#ffe69c' },
-  streakText: { fontSize: 13, fontWeight: '700', color: '#856404', fontFamily: 'InstrumentSans_700Bold' },
+  streakText: { fontSize: 13, fontWeight: '700', color: '#856404', fontFamily: fontText },
 });

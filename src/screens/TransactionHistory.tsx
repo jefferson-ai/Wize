@@ -1,34 +1,47 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Filter } from 'lucide-react-native';
+import { ArrowLeft, Filter, Plus } from 'lucide-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
-import { getTransactions } from '../features/transactions/transactionService';
+import { getTransactions, getLoggingStreak } from '../features/transactions/transactionService';
 import { getCategories } from '../features/categories/categoryService';
+import { getAccounts } from '../features/accounts/accountService';
 import { useFocusEffect } from '@react-navigation/native';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 import { formatAmount } from '../utils/formatters';
 import RadarChart from '../components/RadarChart';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { HeaderRegistrar } from '../components/AnimatedHeader';
+import { useTabHeaderInset } from '../navigation/tabHeaderInset';
+import StreakBadges, { getStreakColor } from '../components/StreakBadges';
+import Confetti, { ConfettiRef } from '../components/Confetti';
+import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 export default function TransactionHistoryScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
   const colors = useThemeColors();
+  const headerInset = useTabHeaderInset();
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
   const [filterType, setFilterType] = useState<'income' | 'expense' | null>(null);
   const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null);
+  const [filterAccountId, setFilterAccountId] = useState<string | null>(null);
   
   const [radarType, setRadarType] = useState<'expense' | 'income'>('expense');
+
+  const [streak, setStreak] = useState(0);
+  const [streakModalVisible, setStreakModalVisible] = useState(false);
+  const confettiRef = useRef<ConfettiRef>(null);
+  const prevStreak = useRef<number | null>(null);
 
   const monthScrollRef = useRef<ScrollView>(null);
 
@@ -37,21 +50,43 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       if (user?.id) {
         fetchData();
       }
-    }, [user?.id, filterType, filterCategoryId])
+    }, [user?.id])
   );
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchData();
+    }
+  }, [filterType, filterCategoryId, filterAccountId]);
 
   const fetchData = async () => {
     if (!user?.id) return;
     setLoading(true);
-    const [fetchedTx, fetchedCats] = await Promise.all([
+    const [fetchedTx, fetchedCats, fetchedAccs, userStreak] = await Promise.all([
       getTransactions(user.id, {
         type: filterType || undefined,
         categoryId: filterCategoryId || undefined,
+        accountId: filterAccountId || undefined,
       }),
-      getCategories(user.id)
+      getCategories(user.id),
+      getAccounts(user.id),
+      getLoggingStreak(user.id)
     ]);
     setTransactions(fetchedTx);
+    setStreak(userStreak);
     if (categories.length === 0) setCategories(fetchedCats);
+    if (accounts.length === 0) setAccounts(fetchedAccs);
+    
+    // Sync selected month with new results
+    if (fetchedTx.length > 0) {
+      const d = new Date(fetchedTx[0].date);
+      const latestKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      // Only force update if current month is gone or if explicitly filtering anew
+      setSelectedMonth(latestKey);
+    } else {
+      setSelectedMonth(null);
+    }
+    
     setLoading(false);
   };
 
@@ -68,9 +103,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
         });
       }
     });
-    const sorted = Array.from(monthSet.values()).sort((a, b) => b.key.localeCompare(a.key));
-    if (!selectedMonth && sorted.length > 0) setSelectedMonth(sorted[0].key);
-    return sorted;
+    return Array.from(monthSet.values()).sort((a, b) => b.key.localeCompare(a.key));
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
@@ -91,8 +124,8 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   }, [filteredTransactions]);
 
   const selectedMonthData = availableMonths.find(m => m.key === selectedMonth);
-  const clearFilters = () => { setFilterType(null); setFilterCategoryId(null); setShowFilters(false); };
-  const activeFilterCount = (filterType ? 1 : 0) + (filterCategoryId ? 1 : 0);
+  const clearFilters = () => { setFilterType(null); setFilterCategoryId(null); setFilterAccountId(null); setShowFilters(false); };
+  const activeFilterCount = (filterType ? 1 : 0) + (filterCategoryId ? 1 : 0) + (filterAccountId ? 1 : 0);
 
   // Radar chart: compare selected month vs previous month
   const radarData = useMemo(() => {
@@ -159,7 +192,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
     <TouchableOpacity
       style={[styles.txRow, { backgroundColor: colors.card }]}
       activeOpacity={0.7}
-      onPress={() => navigation.getParent()?.navigate('EditTransaction', { transaction: item })}
+      onPress={() => navigation.navigate('EditTransaction', { transaction: item })}
       accessibilityRole="button"
       accessibilityLabel={`Edit ${item.category?.name || 'Unknown'} transaction`}
     >
@@ -182,27 +215,29 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   );
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        {navigation.canGoBack() && navigation.getState()?.type !== 'tab' ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Go back">
-            <ArrowLeft size={22} color={colors.text} />
+    <View style={[styles.screen, { flex: 1, backgroundColor: 'transparent' }]}>
+      <HeaderRegistrar 
+        title="Transactions" 
+        index={1}
+        rightElement={
+          <TouchableOpacity
+            onPress={() => setShowFilters(!showFilters)}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle Filters"
+            style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
+          >
+            <Filter size={20} color={colors.background} strokeWidth={2.5} />
+            {activeFilterCount > 0 && (
+              <View style={[styles.filterBadge, { backgroundColor: colors.background, borderColor: colors.text, borderWidth: 1 }]}>
+                <Text style={[styles.filterBadgeText, { color: colors.text }]}>{activeFilterCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
-        ) : (
-          <View style={styles.headerBtn} />
-        )}
-        <Text style={[styles.headerTitle, { color: colors.text }]} accessibilityRole="header">Transactions</Text>
-        <TouchableOpacity onPress={() => setShowFilters(!showFilters)} style={[styles.headerBtn, { position: 'relative' }]} accessibilityRole="button" accessibilityLabel="Toggle Filters">
-          <Filter size={22} color={activeFilterCount > 0 ? colors.text : colors.textMuted} />
-          {activeFilterCount > 0 && (
-            <View style={[styles.filterBadge, { backgroundColor: colors.text }]}>
-              <Text style={[styles.filterBadgeText, { color: colors.background }]}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+        }
+      />
 
+      <View style={{ height: headerInset }} collapsable={false} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Month Navigation */}
       {availableMonths.length > 0 && (
         <View style={[styles.monthBar, { backgroundColor: colors.background }]}>
@@ -265,13 +300,13 @@ export default function TransactionHistoryScreen({ navigation }: any) {
               onPress={() => setFilterType(filterType === 'expense' ? null : 'expense')}
               style={[styles.filterChip, { backgroundColor: colors.background, borderColor: colors.border }, filterType === 'expense' && { backgroundColor: colors.text, borderColor: colors.text }]}
             >
-              <Text style={[styles.filterChipText, filterType === 'expense' && { color: colors.background }]}>Expense</Text>
+              <Text style={[styles.filterChipText, { color: colors.textMuted }, filterType === 'expense' && { color: colors.background }]}>Expense</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setFilterType(filterType === 'income' ? null : 'income')}
               style={[styles.filterChip, { backgroundColor: colors.background, borderColor: colors.border }, filterType === 'income' && { backgroundColor: colors.text, borderColor: colors.text }]}
             >
-              <Text style={[styles.filterChipText, filterType === 'income' && { color: colors.background }]}>Income</Text>
+              <Text style={[styles.filterChipText, { color: colors.textMuted }, filterType === 'income' && { color: colors.background }]}>Income</Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Category</Text>
@@ -282,7 +317,20 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                 onPress={() => setFilterCategoryId(filterCategoryId === cat.id ? null : cat.id)}
                 style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, filterCategoryId === cat.id && { borderColor: colors.text }]}
               >
-                <Text style={[styles.catChipText, filterCategoryId === cat.id && { color: colors.text, fontWeight: '600' }]}>{cat.name}</Text>
+                <Text style={[styles.catChipText, { color: colors.textMuted }, filterCategoryId === cat.id && { color: colors.text, fontWeight: '600' }]}>{cat.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Account</Text>
+          <View style={styles.categoryWrap}>
+            {accounts.map(acc => (
+              <TouchableOpacity
+                key={acc.id}
+                onPress={() => setFilterAccountId(filterAccountId === acc.id ? null : acc.id)}
+                style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, filterAccountId === acc.id && { borderColor: colors.text }]}
+              >
+                <Text style={[styles.catChipText, { color: colors.textMuted }, filterAccountId === acc.id && { color: colors.text, fontWeight: '600' }]}>{acc.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -292,7 +340,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       {/* Transaction List */}
       {loading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#212529" />
+          <ActivityIndicator size="large" color={colors.text} />
         </View>
       ) : (
         <FlatList
@@ -308,13 +356,13 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                   style={[styles.radarToggleBtn, radarType === 'expense' && [styles.radarToggleBtnActive, { backgroundColor: colors.text }]]}
                   onPress={() => setRadarType('expense')}
                 >
-                  <Text style={[styles.radarToggleText, radarType === 'expense' && [styles.radarToggleTextActive, { color: colors.background }]]}>Expenses</Text>
+                  <Text style={[styles.radarToggleText, { color: colors.textMuted }, radarType === 'expense' && [styles.radarToggleTextActive, { color: colors.background }]]}>Expenses</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.radarToggleBtn, radarType === 'income' && [styles.radarToggleBtnActive, { backgroundColor: colors.text }]]}
                   onPress={() => setRadarType('income')}
                 >
-                  <Text style={[styles.radarToggleText, radarType === 'income' && [styles.radarToggleTextActive, { color: colors.background }]]}>Income</Text>
+                  <Text style={[styles.radarToggleText, { color: colors.textMuted }, radarType === 'income' && [styles.radarToggleTextActive, { color: colors.background }]]}>Income</Text>
                 </TouchableOpacity>
               </View>
 
@@ -328,11 +376,11 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                 {comparisonData!.change !== 0 && (
                   <View style={[
                     styles.radarBadge,
-                    { backgroundColor: comparisonData!.change > 0 ? (radarType === 'income' ? '#dcfce7' : '#fee2e2') : (radarType === 'income' ? '#fee2e2' : '#dcfce7') }
+                    { backgroundColor: comparisonData!.change > 0 ? (radarType === 'income' ? colors.successBg : colors.dangerBg) : (radarType === 'income' ? colors.dangerBg : colors.successBg) }
                   ]}>
                     <Text style={[
                       styles.radarBadgeText,
-                      { color: comparisonData!.change > 0 ? (radarType === 'income' ? '#16a34a' : '#dc2626') : (radarType === 'income' ? '#dc2626' : '#16a34a') }
+                      { color: comparisonData!.change > 0 ? (radarType === 'income' ? colors.success : colors.danger) : (radarType === 'income' ? colors.danger : colors.success) }
                     ]}>
                       {comparisonData!.change > 0 ? '↑' : '↓'}{Math.abs(comparisonData!.change).toFixed(1)}%
                     </Text>
@@ -356,7 +404,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                 />
               ) : (
                 <View style={{ height: 260, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#9aa2ad', fontFamily: 'InstrumentSans_400Regular' }}>No {radarType} data for this period</Text>
+                  <Text style={{ color: '#9aa2ad', fontFamily: fontText }}>No {radarType} data for this period</Text>
                 </View>
               )}
 
@@ -377,80 +425,79 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           ) : null}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}>
-              <Text style={{ color: colors.textMuted, fontSize: 16, fontFamily: 'InstrumentSans_400Regular' }}>No transactions found</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 16, fontFamily: fontText }}>No transactions found</Text>
               {activeFilterCount > 0 && (
                 <TouchableOpacity onPress={clearFilters} style={{ marginTop: 14 }}>
-                  <Text style={{ color: colors.text, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' }}>Clear Filters</Text>
+                  <Text style={{ color: colors.text, fontWeight: '600', fontFamily: fontText }}>Clear Filters</Text>
                 </TouchableOpacity>
               )}
             </View>
           )}
         />
       )}
-    </SafeAreaView>
+      </View>
+      <StreakBadges 
+        streak={streak} 
+        isVisible={streakModalVisible} 
+        onClose={() => setStreakModalVisible(false)} 
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f5f6f7' },
-
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#f5f6f7' },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
-  filterBadge: { position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#212529', alignItems: 'center', justifyContent: 'center' },
-  filterBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  screen: { flex: 1 },
+  pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16 },
+  pageTitle: { fontSize: 26, fontWeight: '700', color: '#212529', fontFamily: fontDisplay },
+  addBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#212529', alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  
+  filterBadge: { position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  filterBadgeText: { fontSize: 10, fontWeight: '700' },
 
   monthBar: { backgroundColor: '#f5f6f7', paddingBottom: 10 },
   monthPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginRight: 8 },
-  monthPillActive: { backgroundColor: '#212529' },
-  monthPillInactive: { backgroundColor: '#e8eaec' },
-  monthPillText: { fontSize: 13, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  monthPillTextActive: { color: '#ffffff' },
-  monthPillTextInactive: { color: '#687280' },
+  monthPillText: { fontSize: 13, fontWeight: '600', fontFamily: fontRounded },
 
   summaryRow: { flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: 20, marginBottom: 8, backgroundColor: '#ffffff', borderRadius: 20, paddingVertical: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  summaryLabel: { fontSize: 11, color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontFamily: 'InstrumentSans_400Regular' },
-  summaryValue: { fontSize: 14, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  summaryLabel: { fontSize: 11, color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontFamily: fontText },
+  summaryValue: { fontSize: 14, fontWeight: '700', fontFamily: fontText },
   summaryDivider: { width: 1, backgroundColor: '#e8eaec' },
 
   filterPanel: { backgroundColor: '#ffffff', marginHorizontal: 20, marginBottom: 10, borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   filterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  filterTitle: { fontWeight: '700', color: '#212529', fontSize: 15, fontFamily: 'InstrumentSans_700Bold' },
-  clearText: { color: '#212529', fontWeight: '600', fontSize: 13, fontFamily: 'InstrumentSans_600SemiBold' },
-  filterSectionLabel: { fontSize: 11, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, fontFamily: 'InstrumentSans_700Bold' },
+  filterTitle: { fontWeight: '700', color: '#212529', fontSize: 15, fontFamily: fontText },
+  clearText: { color: '#212529', fontWeight: '600', fontSize: 13, fontFamily: fontText },
+  filterSectionLabel: { fontSize: 11, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, fontFamily: fontText },
   filterTypeRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e8eaec' },
-  filterChipActive: { backgroundColor: '#212529', borderColor: '#212529' },
-  filterChipText: { fontWeight: '600', color: '#687280', fontFamily: 'InstrumentSans_600SemiBold' },
-  filterChipTextActive: { color: '#ffffff' },
+  filterChipText: { fontWeight: '600', color: '#687280', fontFamily: fontRounded },
   categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   catChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#e8eaec' },
-  catChipActive: { backgroundColor: '#f5f6f7', borderColor: '#212529' },
-  catChipText: { fontSize: 12, color: '#687280', fontFamily: 'InstrumentSans_400Regular' },
-  catChipTextActive: { color: '#212529', fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
+  catChipText: { fontSize: 12, color: '#687280', fontFamily: fontText },
 
   txRow: { backgroundColor: '#ffffff', borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   txIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  txName: { fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: 'InstrumentSans_600SemiBold' },
-  txNote: { fontSize: 12, color: '#9aa2ad', marginTop: 2, fontFamily: 'InstrumentSans_400Regular' },
-  txAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
-  txDate: { fontSize: 11, color: '#9aa2ad', marginTop: 2, fontFamily: 'InstrumentSans_400Regular' },
+  txName: { fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: fontText },
+  txNote: { fontSize: 12, color: '#9aa2ad', marginTop: 2, fontFamily: fontText },
+  txAmount: { fontSize: 15, fontWeight: '700', fontFamily: fontText },
+  txDate: { fontSize: 11, color: '#9aa2ad', marginTop: 2, fontFamily: fontText },
 
-  // Radar Comparison Card
   radarCard: { backgroundColor: '#ffffff', borderRadius: 24, padding: 24, marginBottom: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3 },
   radarToggleRow: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 16 },
   radarToggleBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
   radarToggleBtnActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
-  radarToggleText: { fontSize: 13, fontWeight: '600', color: '#64748b', fontFamily: 'InstrumentSans_600SemiBold' },
+  radarToggleText: { fontSize: 13, fontWeight: '600', color: '#64748b', fontFamily: fontText },
   radarToggleTextActive: { color: '#0f172a' },
   radarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  radarTitle: { fontSize: 20, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
-  radarSubtitle: { fontSize: 12, color: '#9aa2ad', marginTop: 3, fontFamily: 'InstrumentSans_400Regular' },
+  radarSubtitle: { fontSize: 12, color: '#9aa2ad', marginTop: 3, fontFamily: fontText },
   radarBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  radarBadgeText: { fontSize: 12, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
-  radarTotal: { fontSize: 34, fontWeight: '700', color: '#212529', letterSpacing: -0.5, marginTop: 6, marginBottom: 8, fontFamily: 'InstrumentSans_700Bold' },
+  radarBadgeText: { fontSize: 12, fontWeight: '700', fontFamily: fontText },
+  radarTotal: { fontSize: 34, fontWeight: '700', color: '#212529', letterSpacing: -0.5, marginTop: 6, marginBottom: 8, fontFamily: fontDisplay },
   radarLegend: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginTop: 12 },
   radarLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   radarLegendDot: { width: 8, height: 8, borderRadius: 4 },
-  radarLegendText: { fontSize: 12, color: '#687280', fontFamily: 'InstrumentSans_400Regular' },
+  radarLegendText: { fontSize: 12, color: '#687280', fontFamily: fontText },
+  
+  streakBadge: { backgroundColor: '#fff3cd', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#ffe69c' },
+  streakText: { fontSize: 13, fontWeight: '700', color: '#856404', fontFamily: fontRounded },
 });

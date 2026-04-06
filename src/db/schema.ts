@@ -9,6 +9,18 @@ export const categories = sqliteTable('categories', {
   color: text('color').notNull(),
 });
 
+export const accounts = sqliteTable('accounts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id'),
+  name: text('name').notNull(),
+  type: text('type', { enum: ['bank', 'credit', 'cash'] }).notNull(),
+  balance: real('balance').default(0).notNull(),
+  currency: text('currency').notNull(),
+  color: text('color').notNull(),
+  icon: text('icon').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 export const transactions = sqliteTable('transactions', {
   id: text('id').primaryKey(),
   userId: text('user_id'),
@@ -16,6 +28,7 @@ export const transactions = sqliteTable('transactions', {
   amount: real('amount').notNull(),
   currency: text('currency').notNull(),
   categoryId: text('category_id').references(() => categories.id),
+  accountId: text('account_id').references(() => accounts.id), // New link to account
   date: text('date').notNull(), // Stored as ISO string
   note: text('note'),
   receiptUrl: text('receipt_url'),

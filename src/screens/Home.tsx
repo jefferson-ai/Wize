@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActionSheetIOS, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { PieChart } from 'react-native-gifted-charts';
@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { getDashboardSummary, getTransactions, getLoggingStreak, checkLoggedToday, logNoSpendDay } from '../features/transactions/transactionService';
 import { getBudgetConsumption } from '../features/budgets/budgetService';
+import { getAccounts, getTotalBalance, ensureDefaultAccount, Account } from '../features/accounts/accountService';
 import { getSavingGoals, getSavingsStrategies } from '../features/savings/savingsService';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 import { seedDefaultCategories } from '../features/categories/categoryService';
@@ -17,14 +18,19 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import StreakBadges, { getStreakColor } from '../components/StreakBadges';
 import Confetti, { ConfettiRef } from '../components/Confetti';
 import SavingBucket from '../components/SavingBucket';
+import { HeaderRegistrar } from '../components/AnimatedHeader';
+import { TabNavigationContext } from '../navigation/navigationContext';
+import { useTabHeaderInset } from '../navigation/tabHeaderInset';
+import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
-const { width } = Dimensions.get('window');
+const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
-  
+
   const [summary, setSummary] = useState({ balance: 0, income: 0, expense: 0, categoryData: [] as any[] });
+  const [totalBalance, setTotalBalance] = useState(0);
   const [recentTx, setRecentTx] = useState<any[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
   const [allBudgets, setAllBudgets] = useState<any[]>([]);
@@ -34,7 +40,13 @@ export default function HomeScreen({ navigation }: any) {
   const [streak, setStreak] = useState(0);
   const [hasLoggedToday, setHasLoggedToday] = useState(true);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
+
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+
   const colors = useThemeColors();
+  const headerInset = useTabHeaderInset();
+  const tabNav = React.useContext(TabNavigationContext);
   
   const confettiRef = React.useRef<ConfettiRef>(null);
   const prevStreak = React.useRef<number | null>(null);
@@ -51,14 +63,17 @@ export default function HomeScreen({ navigation }: any) {
       if (user?.id) {
         loadData();
       }
-    }, [user?.id])
+    }, [user?.id, selectedAccountId])
   );
 
   const loadData = async () => {
     if (!user?.id) return;
-    await seedDefaultCategories(user.id);
-    const [dashSummary, recent, consumption, userStreak, loggedToday, goals, strategiesRes] = await Promise.all([
-      getDashboardSummary(user.id),
+    await ensureDefaultAccount(user.id, currency);
+
+    const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, strategiesRes] = await Promise.all([
+      getDashboardSummary(user.id, selectedAccountId || undefined),
+      getTotalBalance(user.id),
+      getAccounts(user.id),
       getTransactions(user.id, { limit: 3 }),
       getBudgetConsumption(user.id),
       getLoggingStreak(user.id),
@@ -67,6 +82,8 @@ export default function HomeScreen({ navigation }: any) {
       getSavingsStrategies(user.id)
     ]);
     setSummary(dashSummary as any);
+    setTotalBalance(total);
+    setAccounts(allAccounts);
     setRecentTx(recent);
     setAllBudgets(consumption.sort((a, b) => b.percentageUsed - a.percentageUsed).slice(0, 4));
     setStreak(userStreak);
@@ -82,6 +99,44 @@ export default function HomeScreen({ navigation }: any) {
     setBudgetAlerts(criticalBudgets);
   };
 
+  const showFilterOptions = () => {
+    const options = ['All Accounts', ...accounts.map(a => a.name), 'Cancel'];
+    const cancelButtonIndex = options.length - 1;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          title: 'Filter Summary',
+        },
+        buttonIndex => {
+          if (buttonIndex === 0) {
+            setSelectedAccountId(null);
+          } else if (buttonIndex < cancelButtonIndex) {
+            setSelectedAccountId(accounts[buttonIndex - 1].id);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Filter Summary',
+        'Choose a wallet to view its category breakdown.',
+        options.slice(0, cancelButtonIndex).map((opt, idx) => ({
+          text: opt,
+          onPress: () => {
+            if (idx === 0) setSelectedAccountId(null);
+            else setSelectedAccountId(accounts[idx - 1].id);
+          }
+        }))
+      );
+    }
+  };
+
+  const selectedAccountName = selectedAccountId 
+    ? accounts.find(a => a.id === selectedAccountId)?.name || 'All'
+    : 'All';
+
   const hasChartData = summary.categoryData && summary.categoryData.length > 0;
   const firstName = user?.email?.split('@')[0] || 'there';
 
@@ -96,46 +151,43 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
-        
+    <View style={[styles.screen, { flex: 1, backgroundColor: 'transparent' }]}>
+      <HeaderRegistrar 
+        title="Home" 
+        index={0}
+        streak={streak}
+        onStreakPress={() => setStreakModalVisible(true)}
+        confettiRef={confettiRef}
+        rightElement={
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Notifications')}
+            style={[styles.bellBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Bell size={20} color={colors.text} />
+            {budgetAlerts.length > 0 && <View style={styles.notifBadge} />}
+          </TouchableOpacity>
+        }
+      />
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
+        contentContainerStyle={{ paddingBottom: 110 }}
+      >
+        <View style={{ height: headerInset }} collapsable={false} />
+        <View
+          style={{
+            backgroundColor: colors.background,
+            flexGrow: 1,
+            minHeight: Math.max(0, WINDOW_HEIGHT - headerInset),
+          }}
+        >
         {/* Greeting */}
         <View style={styles.greetingRow}>
           <View>
             <Text style={[styles.greetingLabel, { color: colors.textMuted }]}>Welcome back</Text>
             <Text style={[styles.greetingName, { color: colors.text }]}>{firstName} 👋</Text>
-          </View>
-          
-          {/* Streak & Notifications row */}
-          <View style={styles.headerActions}>
-            <TouchableOpacity 
-              activeOpacity={0.7}
-              onPress={() => setStreakModalVisible(true)}
-              style={[
-                styles.streakBadge, 
-                streak === 0 ? { opacity: 0.5, backgroundColor: colors.border } : { 
-                  backgroundColor: getStreakColor(streak, colors.border) + '15',
-                  borderColor: getStreakColor(streak, colors.border)
-                }
-              ]}
-            >
-              <Text style={[
-                styles.streakText, 
-                streak === 0 ? { color: colors.textMuted } : { color: getStreakColor(streak, colors.border) }
-              ]}>
-                {streak} 🔥
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => navigation.navigate('Notifications')}
-              style={[styles.bellBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-              <Bell size={20} color={colors.text} />
-              {budgetAlerts.length > 0 && <View style={styles.notifBadge} />}
-            </TouchableOpacity>
-            <Confetti ref={confettiRef} />
           </View>
         </View>
 
@@ -187,18 +239,8 @@ export default function HomeScreen({ navigation }: any) {
 
             {/* Balance amount */}
             <Text style={styles.balanceAmount}>
-              {balanceHidden ? '••••••' : `${currency} ${formatAmount(summary.balance)}`}
+              {balanceHidden ? '••••••' : `${currency} ${formatAmount(totalBalance)}`}
             </Text>
-
-            {/* Period change pill */}
-            <View style={styles.changePill}>
-              <Text style={styles.changePillText}>
-                {balanceHidden
-                  ? '••••'
-                  : `${summary.income >= summary.expense ? '▲' : '▼'} ${currency} ${formatAmount(Math.abs(summary.income - summary.expense))}`}
-              </Text>
-              <Text style={styles.changePillSub}>  this period</Text>
-            </View>
           </View>
 
           <View style={styles.cardFooter}>
@@ -223,21 +265,22 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Chart Section */}
         <View style={styles.section}>
           <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
-            {/* Card Header */}
             <View style={styles.chartHeader}>
               <Text style={[styles.chartTitle, { color: colors.text }]}>Expenses by Category</Text>
-              <View style={[styles.chartDropdown, { borderColor: colors.border }]}>
-                <Text style={[styles.chartDropdownText, { color: colors.textMuted }]}>All</Text>
+              <TouchableOpacity 
+                style={[styles.chartDropdown, { borderColor: colors.border }]}
+                onPress={showFilterOptions}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.chartDropdownText, { color: colors.textMuted }]}>{selectedAccountName}</Text>
                 <ChevronDown size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
-              </View>
+              </TouchableOpacity>
             </View>
 
             {hasChartData ? (
               <>
-                {/* Donut Chart */}
                 <View style={styles.chartWrapper}>
                   <PieChart
                     donut
@@ -252,10 +295,10 @@ export default function HomeScreen({ navigation }: any) {
                       const pct = summary.expense > 0 && topCat ? ((topCat.value / summary.expense) * 100).toFixed(0) : '0';
                       return (
                         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, fontFamily: 'InstrumentSans_700Bold' }}>
+                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, fontFamily: fontText }}>
                             {topCat ? topCat.label : 'Expenses'}
                           </Text>
-                          <Text style={{ color: colors.textMuted, fontSize: 13, fontFamily: 'InstrumentSans_400Regular', marginTop: 2 }}>
+                          <Text style={{ color: colors.textMuted, fontSize: 13, fontFamily: fontText, marginTop: 2 }}>
                             {topCat ? `${pct}%` : `${currency} ${formatAmount(summary.expense)}`}
                           </Text>
                         </View>
@@ -284,7 +327,7 @@ export default function HomeScreen({ navigation }: any) {
               </>
             ) : (
               <View style={{ height: 160, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#9aa2ad', fontFamily: 'InstrumentSans_400Regular' }}>No expenses yet</Text>
+                <Text style={{ color: colors.textMuted, fontFamily: fontText }}>No expenses yet</Text>
               </View>
             )}
           </View>
@@ -296,7 +339,7 @@ export default function HomeScreen({ navigation }: any) {
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>My Budgets</Text>
               <TouchableOpacity
-                onPress={() => navigation.navigate('Planning')}
+                onPress={() => tabNav?.jumpToTab('Planning')}
                 style={styles.seeAllBtn}
               >
                 <Text style={[styles.seeAllText, { color: colors.text }]}>Manage</Text>
@@ -378,7 +421,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Transactions</Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('Transactions')}
+              onPress={() => tabNav?.jumpToTab('Transactions')}
               accessibilityRole="button"
               accessibilityLabel="See all transactions"
               style={styles.seeAllBtn}
@@ -392,7 +435,14 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.emptyText}>No recent transactions</Text>
           ) : (
             recentTx.map(tx => (
-              <View key={tx.id} style={[styles.txRow, { backgroundColor: colors.card }]}>
+              <TouchableOpacity
+                key={tx.id}
+                style={[styles.txRow, { backgroundColor: colors.card }]}
+                activeOpacity={0.7}
+                onPress={() => navigation.navigate('EditTransaction', { transaction: tx })}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${tx.category?.name || 'Unknown'} transaction`}
+              >
                 <View style={[styles.txIcon, { backgroundColor: (tx.category?.color || '#94a3b8') + '22' }]}>
                   <Text style={{ fontSize: 22 }}>{getCategoryEmoji(tx.category?.name)}</Text>
                 </View>
@@ -406,9 +456,10 @@ export default function HomeScreen({ navigation }: any) {
                   </Text>
                   <Text style={[styles.txDate, { color: colors.textMuted }]}>{new Date(tx.date).toLocaleDateString()}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
+        </View>
         </View>
       </ScrollView>
 
@@ -417,34 +468,34 @@ export default function HomeScreen({ navigation }: any) {
         isVisible={streakModalVisible} 
         onClose={() => setStreakModalVisible(false)} 
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#f5f6f7' },
+  screen: { flex: 1 },
   greetingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  greetingLabel: { fontSize: 13, color: '#9aa2ad', fontFamily: 'InstrumentSans_400Regular' },
-  greetingName: { fontSize: 22, fontWeight: '700', color: '#212529', fontFamily: 'InstrumentSans_700Bold' },
+  greetingLabel: { fontSize: 13, color: '#9aa2ad', fontFamily: fontText },
+  greetingName: { fontSize: 22, fontWeight: '700', color: '#212529', fontFamily: fontDisplay },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10, zIndex: 100 },
   streakBadge: { backgroundColor: '#fff3cd', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#ffe69c' },
-  streakText: { fontSize: 14, fontWeight: '700', color: '#856404', fontFamily: 'InstrumentSans_700Bold' },
-  bellBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, backgroundColor: '#ffffff' },
-  notifBadge: { position: 'absolute', top: 11, right: 12, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444', borderWidth: 1.5, borderColor: '#ffffff' },
+  streakText: { fontSize: 14, fontWeight: '700', color: '#856404', fontFamily: fontRounded },
+  bellBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  notifBadge: { position: 'absolute', top: 11, right: 12, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444', borderWidth: 1.5, borderColor: 'transparent' },
 
   // Savings
   savingsScroll: { paddingRight: 20, paddingBottom: 10 },
   savingsPromo: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 24, borderWidth: 1, marginBottom: 10 },
   promoIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
-  promoTitle: { fontSize: 15, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
-  promoSub: { fontSize: 12, fontFamily: 'InstrumentSans_400Regular', marginTop: 2 },
+  promoTitle: { fontSize: 15, fontWeight: '700', fontFamily: fontDisplay },
+  promoSub: { fontSize: 12, fontFamily: fontText, marginTop: 2 },
 
   // No Spend Banner
   noSpendBanner: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 4, padding: 16, borderRadius: 16, borderWidth: 1 },
-  noSpendTitle: { fontSize: 14, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold', marginBottom: 2 },
-  noSpendSub: { fontSize: 12, fontFamily: 'InstrumentSans_400Regular' },
+  noSpendTitle: { fontSize: 14, fontWeight: '700', fontFamily: fontDisplay, marginBottom: 2 },
+  noSpendSub: { fontSize: 12, fontFamily: fontText },
   noSpendBtnWrapper: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
-  noSpendBtnText: { fontSize: 13, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  noSpendBtnText: { fontSize: 13, fontWeight: '700', fontFamily: fontDisplay },
 
   // Wallet Card
   card: { marginHorizontal: 20, marginTop: 12, borderRadius: 24, backgroundColor: '#212529', overflow: 'hidden', shadowColor: '#212529', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10 },
@@ -453,13 +504,13 @@ const styles = StyleSheet.create({
   cardInner: { padding: 20 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   balanceLabelRow: { flexDirection: 'row', alignItems: 'center' },
-  balanceLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: 'InstrumentSans_600SemiBold' },
+  balanceLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', fontFamily: fontRounded },
   brandBadge: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  brandBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
-  balanceAmount: { color: '#fff', fontSize: 34, fontWeight: '700', letterSpacing: -0.5, marginBottom: 8, fontFamily: 'InstrumentSans_700Bold' },
+  brandBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', fontFamily: fontRounded },
+  balanceAmount: { color: '#fff', fontSize: 34, fontWeight: '700', letterSpacing: -0.5, marginBottom: 8, fontFamily: fontDisplay },
   changePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  changePillText: { color: '#fff', fontSize: 13, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  changePillSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'InstrumentSans_400Regular' },
+  changePillText: { color: '#fff', fontSize: 13, fontWeight: '600', fontFamily: fontRounded },
+  changePillSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: fontText },
 
   // Card Footer (Income/Expenses)
   cardFooter: { flexDirection: 'row', paddingBottom: 20, justifyContent: 'space-evenly', alignItems: 'center' },
@@ -467,27 +518,27 @@ const styles = StyleSheet.create({
   cardFooterDivider: { width: 0, opacity: 0 },
   cardFooterLabelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   cardFooterDot: { width: 4, height: 4, borderRadius: 2, marginRight: 5 },
-  cardFooterLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: 'InstrumentSans_600SemiBold' },
-  cardFooterValue: { color: '#ffffff', fontSize: 15, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  cardFooterLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: fontRounded, fontWeight: '600' },
+  cardFooterValue: { color: '#ffffff', fontSize: 15, fontWeight: '700', fontFamily: fontDisplay },
 
   // Sections
   section: { paddingHorizontal: 20, marginTop: 28 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#212529', marginBottom: 14, fontFamily: 'InstrumentSans_700Bold' },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#212529', marginBottom: 14, fontFamily: fontDisplay },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  seeAllText: { fontSize: 13, fontWeight: '600', color: '#212529', fontFamily: 'InstrumentSans_600SemiBold' },
+  seeAllText: { fontSize: 13, fontWeight: '600', color: '#212529', fontFamily: fontRounded },
 
   // Chart
   chartCard: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3 },
   chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  chartTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', fontFamily: 'InstrumentSans_700Bold' },
+  chartTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', fontFamily: fontDisplay },
   chartDropdown: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  chartDropdownText: { fontSize: 12, color: '#475569', fontFamily: 'InstrumentSans_400Regular' },
+  chartDropdownText: { fontSize: 12, color: '#475569', fontFamily: fontText },
   chartWrapper: { alignItems: 'center', paddingVertical: 20 },
   legendContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: 20, paddingHorizontal: 10, rowGap: 8 },
   legendItem: { flexDirection: 'row', alignItems: 'center' },
   legendDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
-  legendText: { fontSize: 11, color: '#64748b', fontFamily: 'InstrumentSans_400Regular' },
+  legendText: { fontSize: 11, color: '#64748b', fontFamily: fontText },
   legendDivider: { width: 1, height: 10, backgroundColor: '#e2e8f0', marginHorizontal: 8 },
 
   // Alerts
@@ -495,25 +546,25 @@ const styles = StyleSheet.create({
   alertOver: { },
   alertWarn: { },
   alertIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  alertTitle: { fontWeight: '700', fontSize: 14, marginBottom: 2, fontFamily: 'InstrumentSans_700Bold' },
-  alertBody: { fontSize: 12, color: '#687280', fontFamily: 'InstrumentSans_400Regular' },
+  alertTitle: { fontWeight: '700', fontSize: 14, marginBottom: 2, fontFamily: fontText },
+  alertBody: { fontSize: 12, color: '#687280', fontFamily: fontText },
 
   // Transactions
   txRow: { backgroundColor: '#ffffff', borderRadius: 18, padding: 14, flexDirection: 'row', alignItems: 'center', marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   txIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  txName: { fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: 'InstrumentSans_600SemiBold' },
-  txNote: { fontSize: 12, color: '#9aa2ad', marginTop: 2, fontFamily: 'InstrumentSans_400Regular' },
-  txAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
-  txDate: { fontSize: 11, color: '#9aa2ad', marginTop: 2, fontFamily: 'InstrumentSans_400Regular' },
-  emptyText: { color: '#9aa2ad', textAlign: 'center', paddingVertical: 20, fontFamily: 'InstrumentSans_400Regular' },
+  txName: { fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: fontText },
+  txNote: { fontSize: 12, color: '#9aa2ad', marginTop: 2, fontFamily: fontText },
+  txAmount: { fontSize: 15, fontWeight: '700', fontFamily: fontText },
+  txDate: { fontSize: 11, color: '#9aa2ad', marginTop: 2, fontFamily: fontText },
+  emptyText: { color: '#9aa2ad', textAlign: 'center', paddingVertical: 20, fontFamily: fontText },
 
   // Compact Budgets
   budgetListCard: { borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
   budgetRow: { paddingVertical: 12 },
   budgetRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   budgetRowLeft: { flexDirection: 'row', alignItems: 'center' },
-  budgetName: { fontSize: 14, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
-  budgetRemain: { fontSize: 12, fontFamily: 'InstrumentSans_400Regular' },
+  budgetName: { fontSize: 14, fontWeight: '600', fontFamily: fontText },
+  budgetRemain: { fontSize: 12, fontFamily: fontText },
   miniProgressTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
   miniProgressFill: { height: '100%', borderRadius: 2 },
   rowDivider: { height: 1, opacity: 0.3 },

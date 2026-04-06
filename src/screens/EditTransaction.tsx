@@ -12,13 +12,15 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Tag, FileText, CalendarDays, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react-native';
+import { X, Tag, FileText, CalendarDays, ChevronLeft, ChevronRight, Trash2, Wallet } from 'lucide-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { updateTransaction, deleteTransaction } from '../features/transactions/transactionService';
 import { getCategories } from '../features/categories/categoryService';
+import { getAccounts } from '../features/accounts/accountService';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { fontDisplay, fontText } from '../theme/fonts';
 
 export default function EditTransactionScreen({ navigation, route }: any) {
   const { transaction } = route.params;
@@ -32,6 +34,9 @@ export default function EditTransactionScreen({ navigation, route }: any) {
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(transaction.categoryId);
   const [showCategories, setShowCategories] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(transaction.accountId || null);
+  const [showAccounts, setShowAccounts] = useState(false);
   const [date, setDate] = useState(new Date(transaction.date));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,7 +44,10 @@ export default function EditTransactionScreen({ navigation, route }: any) {
   const amountRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (user?.id) loadCategories();
+    if (user?.id) {
+      loadCategories();
+      loadAccounts();
+    }
   }, [user?.id, type]);
 
   const loadCategories = async () => {
@@ -47,6 +55,16 @@ export default function EditTransactionScreen({ navigation, route }: any) {
     const cats = await getCategories(user.id);
     const filtered = cats.filter((c) => c.type === type);
     setCategories(filtered);
+  };
+
+  const loadAccounts = async () => {
+    if (!user?.id) return;
+    const accs = await getAccounts(user.id);
+    setAccounts(accs);
+    if (accs.length > 0 && !selectedAccountId) {
+      // Default to the first account if none is set
+      setSelectedAccountId(accs[0].id);
+    }
   };
 
   const selectedCat = categories.find((c) => c.id === selectedCategory);
@@ -84,6 +102,7 @@ export default function EditTransactionScreen({ navigation, route }: any) {
         amount,
         currency,
         categoryId: selectedCategory,
+        accountId: selectedAccountId,
         date: date.toISOString(),
         note: note || null,
       });
@@ -122,7 +141,7 @@ export default function EditTransactionScreen({ navigation, route }: any) {
       <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => navigation.canGoBack() && navigation.goBack()} />
       <View style={[styles.sheet, { backgroundColor: colors.card }]}>
         {/* Drag handle */}
-        <View style={styles.handle} />
+        <View style={[styles.handle, { backgroundColor: colors.handle }]} />
         <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
@@ -135,9 +154,9 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                   accessibilityRole="button"
                   accessibilityLabel="Close"
                 >
-                  <X size={18} color="#687280" />
+                  <X size={18} color={colors.textMuted} />
                 </TouchableOpacity>
-                <Text style={styles.modalTitle}>Edit Transaction</Text>
+                <Text style={[styles.modalTitle, { color: colors.textMuted }]}>Edit Transaction</Text>
                 <TouchableOpacity
                   onPress={handleDelete}
                   style={[styles.deleteBtn, { backgroundColor: colors.dangerBg }]}
@@ -229,9 +248,46 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                   </View>
                 )}
 
+                {/* Account Selection */}
+                <TouchableOpacity
+                  style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background }]}
+                  onPress={() => { setShowAccounts(!showAccounts); setShowCategories(false); }}
+                  activeOpacity={0.6}
+                >
+                  <View style={[styles.fieldIcon, { backgroundColor: colors.accentRedBg }]}>
+                    <Wallet size={16} color="#ef4444" />
+                  </View>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Account   </Text>
+                  <Text style={[styles.fieldValue, { color: colors.text }]} numberOfLines={1}>
+                    {accounts.find(a => a.id === selectedAccountId)?.name || 'Select Account'}
+                  </Text>
+                  <Text style={styles.chevronText}>{showAccounts ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+
+                {showAccounts && (
+                  <View style={[styles.categoriesBlock, { borderBottomColor: colors.background }]}>
+                    <View style={styles.categoryGrid}>
+                      {accounts.map((acc) => {
+                        const isSelected = selectedAccountId === acc.id;
+                        return (
+                          <TouchableOpacity
+                            key={acc.id}
+                            onPress={() => { setSelectedAccountId(acc.id); setShowAccounts(false); }}
+                            style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
+                          >
+                            <Text style={[styles.catChipText, isSelected && { color: colors.background }]}>
+                              {acc.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
                 {/* Note */}
                 <View style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background }]}>
-                  <View style={[styles.fieldIcon, { backgroundColor: '#fef9c3' }]}>
+                  <View style={[styles.fieldIcon, { backgroundColor: colors.accentYellowBg }]}>
                     <FileText size={16} color="#ca8a04" />
                   </View>
                   <TextInput
@@ -245,7 +301,7 @@ export default function EditTransactionScreen({ navigation, route }: any) {
 
                 {/* Date */}
                 <View style={styles.fieldRow}>
-                  <View style={[styles.fieldIcon, { backgroundColor: '#eff6ff' }]}>
+                  <View style={[styles.fieldIcon, { backgroundColor: colors.accentCalendarBg }]}>
                     <CalendarDays size={16} color="#3b82f6" />
                   </View>
                   <TouchableOpacity 
@@ -303,23 +359,23 @@ export default function EditTransactionScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 0.95, paddingTop: 10 },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#e8eaec', alignSelf: 'center', marginBottom: 4 },
+  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
 
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   closeBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
-  modalTitle: { fontSize: 14, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'InstrumentSans_700Bold' },
+  modalTitle: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, fontFamily: fontDisplay },
   deleteBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
 
   typeToggle: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f5f6f7', borderRadius: 20, padding: 4, marginBottom: 20 },
   typeBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 16 },
   typeBtnActive: { backgroundColor: '#212529' },
-  typeBtnText: { fontSize: 13, fontWeight: '600', color: '#9aa2ad', fontFamily: 'InstrumentSans_600SemiBold' },
+  typeBtnText: { fontSize: 13, fontWeight: '600', color: '#9aa2ad', fontFamily: fontText },
   typeBtnTextActive: { color: '#ffffff' },
 
   amountArea: { alignItems: 'center', paddingHorizontal: 24, paddingBottom: 24 },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },
-  currencySymbol: { fontSize: 26, fontWeight: '700', color: '#c8cdd3', marginRight: 4, fontFamily: 'InstrumentSans_700Bold' },
-  amountInput: { fontSize: 52, fontWeight: '700', color: '#212529', minWidth: 60, fontFamily: 'InstrumentSans_700Bold' } as any,
+  currencySymbol: { fontSize: 26, fontWeight: '700', color: '#c8cdd3', marginRight: 4, fontFamily: fontDisplay },
+  amountInput: { fontSize: 52, fontWeight: '700', color: '#212529', minWidth: 60, fontFamily: fontDisplay } as any,
 
   divider: { height: 1, backgroundColor: '#f5f6f7', marginHorizontal: 20 },
 
@@ -327,26 +383,26 @@ const styles = StyleSheet.create({
   fieldRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16 },
   fieldRowBorder: { borderBottomWidth: 1, borderBottomColor: '#f5f6f7' },
   fieldIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  fieldLabel: { fontSize: 15, color: '#9aa2ad', fontFamily: 'InstrumentSans_400Regular' },
-  fieldValue: { flex: 1, fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: 'InstrumentSans_600SemiBold' },
+  fieldLabel: { fontSize: 15, color: '#9aa2ad', fontFamily: fontText },
+  fieldValue: { flex: 1, fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: fontText },
   chevronText: { fontSize: 13, color: '#c8cdd3' },
 
   categoriesBlock: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f5f6f7' },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   catChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: '#e8eaec', backgroundColor: '#f5f6f7' },
   catChipActive: { backgroundColor: '#212529', borderColor: '#212529' },
-  catChipText: { fontSize: 13, fontWeight: '500', color: '#687280', fontFamily: 'InstrumentSans_500Medium' },
+  catChipText: { fontSize: 13, fontWeight: '500', color: '#687280', fontFamily: fontText },
   catChipTextActive: { color: '#ffffff' },
 
-  noteInput: { flex: 1, fontSize: 15, color: '#212529', fontFamily: 'InstrumentSans_400Regular' },
+  noteInput: { flex: 1, fontSize: 15, color: '#212529', fontFamily: fontText },
 
-  dateText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: 'InstrumentSans_600SemiBold' },
+  dateText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: fontText },
   dateControls: { flexDirection: 'row', gap: 6 },
   dateBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
 
   actionArea: { flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 12, paddingTop: 10, gap: 12 },
   deleteBtnBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 20, paddingVertical: 18, paddingHorizontal: 20, backgroundColor: '#fee2e2', borderWidth: 1, borderColor: '#fecaca' },
-  deleteBtnText: { color: '#dc2626', fontWeight: '700', fontSize: 15, fontFamily: 'InstrumentSans_700Bold' },
+  deleteBtnText: { color: '#dc2626', fontWeight: '700', fontSize: 15, fontFamily: fontText },
   saveBtn: { flex: 1, backgroundColor: '#212529', borderRadius: 20, alignItems: 'center', paddingVertical: 18 },
-  saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 16, fontFamily: 'InstrumentSans_700Bold' },
+  saveBtnText: { color: '#ffffff', fontWeight: '700', fontSize: 16, fontFamily: fontText },
 });

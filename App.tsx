@@ -17,13 +17,6 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from './src/db';
 import migrations from './drizzle/migrations';
 
-import { useFonts } from 'expo-font';
-import {
-  InstrumentSans_400Regular,
-  InstrumentSans_500Medium,
-  InstrumentSans_600SemiBold,
-  InstrumentSans_700Bold,
-} from '@expo-google-fonts/instrument-sans';
 
 export default function App() {
   useAppNotifications();
@@ -35,17 +28,13 @@ export default function App() {
   const isDark = theme === 'dark' || (theme === 'system' && systemColorScheme === 'dark');
   const { success, error } = useMigrations(db, migrations);
 
-  const [fontsLoaded] = useFonts({
-    InstrumentSans_400Regular,
-    InstrumentSans_500Medium,
-    InstrumentSans_600SemiBold,
-    InstrumentSans_700Bold,
-  });
 
   useEffect(() => {
     // Sync the zustand persisted theme configuration with NativeWind's context
-    setColorScheme(theme);
-  }, [theme, setColorScheme]);
+    // Explicitly resolve 'system' to prevent NativeWind from causing Appearance context glitches
+    const resolvedTheme = theme === 'system' ? (systemColorScheme === 'dark' ? 'dark' : 'light') : theme;
+    setColorScheme(resolvedTheme);
+  }, [theme, systemColorScheme, setColorScheme]);
 
   if (error) {
     return (
@@ -55,7 +44,7 @@ export default function App() {
     );
   }
 
-  if (!success || !fontsLoaded) {
+  if (!success) {
     return (
       <View className="flex-1 justify-center items-center bg-white dark:bg-zinc-950">
         <Text className="text-zinc-500">Loading...</Text>

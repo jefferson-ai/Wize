@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Check } from 'lucide-react-native';
 import { OnboardingStackScreenProps } from '../../navigation/types';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { useThemeColors } from '../../hooks/useThemeColors';
+import { fontDisplay, fontText } from '../../theme/fonts';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -21,54 +24,58 @@ const CURRENCIES = [
 
 export default function CurrencySetupScreen({ navigation }: OnboardingStackScreenProps<'CurrencySetup'>) {
   const { currency, setCurrency } = useAppSettingsStore();
+  const colors = useThemeColors();
   const [selectedCurrency, setSelectedCurrency] = useState(currency || 'USD');
 
   const handleNext = () => {
     setCurrency(selectedCurrency);
-    navigation.navigate('BudgetSetup');
+    navigation.navigate('AccountSetup');
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-zinc-950 px-6">
-      <View className="flex-1 mt-8">
-        <Text className="text-3xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
-          Choose Your Currency
-        </Text>
-        <Text className="text-zinc-500 dark:text-zinc-400 mb-8">
-          This will be the main currency used for all your transactions and budgets.
-        </Text>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Choose Your Currency
+          </Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            This will be the main currency used for all your transactions and budgets.
+          </Text>
+        </View>
 
         <FlatList
           data={CURRENCIES}
           keyExtractor={(item) => item.code}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
           renderItem={({ item }) => {
             const isSelected = selectedCurrency === item.code;
+            const borderColor = isSelected ? colors.success : colors.border;
+            const bgColor = isSelected ? (colors.isDark ? 'rgba(34, 197, 94, 0.1)' : '#f0fdf4') : colors.card;
+            
             return (
               <TouchableOpacity
                 onPress={() => setSelectedCurrency(item.code)}
-                className={`flex-row items-center p-4 mb-3 rounded-2xl border ${
-                  isSelected
-                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900'
-                }`}
+                style={[styles.currencyCard, { backgroundColor: bgColor, borderColor }]}
+                activeOpacity={0.7}
               >
-                <View className="w-12 h-12 bg-white dark:bg-zinc-800 rounded-full items-center justify-center mr-4 shadow-sm border border-zinc-100 dark:border-zinc-700">
-                  <Text className="text-xl font-medium text-zinc-800 dark:text-zinc-200">
+                <View style={[styles.symbolBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[styles.symbolText, { color: colors.text }]}>
                     {item.symbol}
                   </Text>
                 </View>
-                <View className="flex-1">
-                  <Text className={`text-lg font-semibold ${isSelected ? 'text-brand-700 dark:text-brand-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                <View style={styles.currencyText}>
+                  <Text style={[styles.codeText, { color: isSelected ? colors.success : colors.text }]}>
                     {item.code}
                   </Text>
-                  <Text className={`text-sm ${isSelected ? 'text-brand-600 dark:text-brand-500' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                  <Text style={[styles.nameText, { color: colors.textMuted }]}>
                     {item.name}
                   </Text>
                 </View>
                 {isSelected && (
-                  <View className="w-6 h-6 rounded-full bg-brand-500 items-center justify-center">
-                    <Text className="text-white text-xs font-bold">✓</Text>
+                  <View style={[styles.checkCircle, { backgroundColor: colors.success }]}>
+                    <Check size={14} color="#ffffff" strokeWidth={3} />
                   </View>
                 )}
               </TouchableOpacity>
@@ -76,15 +83,102 @@ export default function CurrencySetupScreen({ navigation }: OnboardingStackScree
           }}
         />
 
-        <View className="py-4">
+        <View style={styles.footer}>
           <TouchableOpacity
-            className="w-full bg-brand-500 py-4 rounded-xl items-center"
+            style={[styles.primaryButton, { backgroundColor: colors.text }]}
             onPress={handleNext}
           >
-            <Text className="text-white font-semibold text-lg">Continue</Text>
+            <Text style={[styles.primaryButtonText, { color: colors.background }]}>Continue</Text>
           </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+  },
+  header: {
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 32,
+    fontFamily: fontDisplay,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: fontText,
+    fontWeight: '400',
+    lineHeight: 24,
+  },
+  currencyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  symbolBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  symbolText: {
+    fontSize: 20,
+    fontFamily: fontDisplay,
+    fontWeight: '600',
+  },
+  currencyText: {
+    flex: 1,
+  },
+  codeText: {
+    fontSize: 18,
+    fontFamily: fontDisplay,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  nameText: {
+    fontSize: 14,
+    fontFamily: fontText, fontWeight: '500',
+  },
+  checkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footer: {
+    paddingVertical: 16,
+  },
+  primaryButton: {
+    width: '100%',
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  primaryButtonText: {
+    fontSize: 17,
+    fontFamily: fontDisplay,
+    fontWeight: '700',
+  },
+});

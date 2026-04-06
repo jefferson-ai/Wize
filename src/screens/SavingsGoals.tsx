@@ -7,6 +7,7 @@ import { getSavingGoals, getSavingsStrategies } from '../features/savings/saving
 import SavingBucket from '../components/SavingBucket';
 import { useFocusEffect } from '@react-navigation/native';
 import { formatAmount } from '../utils/formatters';
+import { fontText } from '../theme/fonts';
 
 const { width } = Dimensions.get('window');
 
@@ -69,22 +70,34 @@ export default function SavingsGoalsScreen({ navigation }: any) {
 
         <View style={styles.strategiesContainer}>
           {/* Strategy A: Spare Change */}
-          <View style={[styles.strategyCard, { backgroundColor: '#f0f9ff', borderColor: '#bae6fd' }]}>
-            <View style={styles.strategyIconWrap}>
-              <Sparkles size={18} color="#0369a1" />
+          <View style={[
+            styles.strategyCard, 
+            { 
+              backgroundColor: colors.isDark ? 'rgba(3, 105, 161, 0.15)' : '#f0f9ff', 
+              borderColor: colors.isDark ? 'rgba(3, 105, 161, 0.3)' : '#bae6fd' 
+            }
+          ]}>
+            <View style={[styles.strategyIconWrap, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : '#ffffff' }]}>
+              <Sparkles size={18} color={colors.isDark ? '#7dd3fc' : '#0369a1'} />
             </View>
-            <Text style={[styles.strategyLabel, { color: '#0369a1' }]}>Option A</Text>
+            <Text style={[styles.strategyLabel, { color: colors.isDark ? '#7dd3fc' : '#0369a1' }]}>Option A</Text>
             <Text style={[styles.strategyName, { color: colors.text }]}>Spare Change</Text>
             <Text style={[styles.strategyAmount, { color: colors.text }]}>GHS {formatAmount(strategies.spareChange)}</Text>
             <Text style={[styles.strategyDetail, { color: colors.textMuted }]}>Rounding up to nearest GHS 1.00 this month</Text>
           </View>
 
           {/* Strategy B: Multiplier */}
-          <View style={[styles.strategyCard, { backgroundColor: '#fdf4ff', borderColor: '#f5d0fe' }]}>
-            <View style={styles.strategyIconWrap}>
-              <TrendingUp size={18} color="#a21caf" />
+          <View style={[
+            styles.strategyCard, 
+            { 
+              backgroundColor: colors.isDark ? 'rgba(162, 28, 175, 0.15)' : '#fdf4ff', 
+              borderColor: colors.isDark ? 'rgba(162, 28, 175, 0.3)' : '#f5d0fe' 
+            }
+          ]}>
+            <View style={[styles.strategyIconWrap, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : '#ffffff' }]}>
+              <TrendingUp size={18} color={colors.isDark ? '#f0abfc' : '#a21caf'} />
             </View>
-            <Text style={[styles.strategyLabel, { color: '#a21caf' }]}>Option B</Text>
+            <Text style={[styles.strategyLabel, { color: colors.isDark ? '#f0abfc' : '#a21caf' }]}>Option B</Text>
             <Text style={[styles.strategyName, { color: colors.text }]}>Steady Growth</Text>
             <Text style={[styles.strategyAmount, { color: colors.text }]}>GHS {formatAmount(strategies.multiplier)}</Text>
             <Text style={[styles.strategyDetail, { color: colors.textMuted }]}>Saving fixed GHS 2.00 per purchase this month</Text>
@@ -147,7 +160,7 @@ export default function SavingsGoalsScreen({ navigation }: any) {
         )}
 
         <View style={styles.milestoneBox}>
-          <View style={[styles.milestoneIcon, { backgroundColor: '#f0fdf4' }]}>
+          <View style={[styles.milestoneIcon, { backgroundColor: colors.accentGreenBg }]}>
             <TrendingUp size={20} color="#22c55e" />
           </View>
           <Text style={[styles.milestoneText, { color: colors.textMuted }]}>
@@ -172,7 +185,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '800',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -208,7 +221,7 @@ const styles = StyleSheet.create({
   strategiesTitle: {
     fontSize: 22,
     fontWeight: '800',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
   },
   strategiesContainer: {
     flexDirection: 'row',
@@ -240,19 +253,19 @@ const styles = StyleSheet.create({
   strategyName: {
     fontSize: 13,
     fontWeight: '600',
-    fontFamily: 'InstrumentSans_600SemiBold',
+    fontFamily: fontText,
     marginBottom: 8,
   },
   strategyAmount: {
     fontSize: 20,
     fontWeight: '800',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
     marginBottom: 8,
   },
   strategyDetail: {
     fontSize: 10,
     lineHeight: 14,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
   statBox: {
     flexDirection: 'row',
@@ -264,7 +277,7 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 11,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -275,11 +288,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
   },
   goalCount: {
     fontSize: 13,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
   goalsGrid: {
     flexDirection: 'row',
@@ -306,7 +319,7 @@ const styles = StyleSheet.create({
   },
   targetText: {
     fontSize: 10,
-    fontFamily: 'InstrumentSans_500Medium',
+    fontFamily: fontText, fontWeight: '500',
   },
   emptyGoals: {
     padding: 40,
@@ -319,14 +332,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 14,
     marginBottom: 6,
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
   },
   emptySub: {
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
   learnMoreBtn: {
     paddingVertical: 8,
@@ -335,7 +348,7 @@ const styles = StyleSheet.create({
   learnMoreText: {
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontText,
   },
   milestoneBox: {
     flexDirection: 'row',
@@ -355,6 +368,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
     lineHeight: 18,
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
 });

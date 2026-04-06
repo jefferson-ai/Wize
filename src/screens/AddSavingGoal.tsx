@@ -7,6 +7,7 @@ import { useAppSettingsStore } from '../store/appSettingsStore';
 import { createSavingGoal } from '../features/savings/savingsService';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatAmount } from '../utils/formatters';
+import { fontDisplay, fontText } from '../theme/fonts';
 
 const GOAL_ICONS = [
   { name: 'Target', Icon: Target },
@@ -162,19 +163,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
   closeBtn: { padding: 8 },
-  headerTitle: { fontSize: 17, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  headerTitle: { fontSize: 17, fontWeight: '700', fontFamily: fontDisplay },
   saveBtn: { padding: 8 },
-  saveBtnText: { fontSize: 16, fontWeight: '700', fontFamily: 'InstrumentSans_700Bold' },
+  saveBtnText: { fontSize: 16, fontWeight: '700', fontFamily: fontText },
 
   amountArea: { alignItems: 'center', paddingVertical: 32 },
-  amountLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12, fontFamily: 'InstrumentSans_600SemiBold' },
+  amountLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12, fontFamily: fontText },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },
-  currencyText: { fontSize: 30, fontWeight: '700', marginRight: 4, fontFamily: 'InstrumentSans_700Bold' },
-  amountText: { fontSize: 56, fontWeight: '700', letterSpacing: -1, fontFamily: 'InstrumentSans_700Bold', minWidth: 60 } as any,
+  currencyText: { fontSize: 30, fontWeight: '700', marginRight: 4, fontFamily: fontDisplay },
+  amountText: { fontSize: 56, fontWeight: '700', letterSpacing: -1, fontFamily: fontDisplay, minWidth: 60 } as any,
 
   inputGroup: { paddingVertical: 16, borderBottomWidth: 1 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: 'InstrumentSans_700Bold' },
-  nameInput: { fontSize: 20, fontWeight: '600', fontFamily: 'InstrumentSans_600SemiBold' },
+  sectionLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 16, fontFamily: fontText },
+  nameInput: { fontSize: 20, fontWeight: '600', fontFamily: fontDisplay },
 
   colorGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 },
   colorCircle: { width: 44, height: 44, borderRadius: 22 },

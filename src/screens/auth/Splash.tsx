@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, ActivityIndicator, Image, StyleSheet } from 'react-native';
 
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { fontDisplay, fontText } from '../../theme/fonts';
 
 const dollarIcon = require('../../assets/dollar-icon.png');
 
@@ -23,7 +24,7 @@ export default function SplashScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f6f7' },
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   logo: { width: 120, height: 120, marginBottom: 24 },
-  title: { fontSize: 36, fontWeight: '800', color: '#212529', marginBottom: 24, letterSpacing: 1, fontFamily: 'InstrumentSans_700Bold' },
+  title: { fontSize: 36, fontWeight: '800', color: '#212529', marginBottom: 24, letterSpacing: 1, fontFamily: fontDisplay },
 });

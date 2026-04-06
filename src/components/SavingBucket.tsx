@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
 interface SavingBucketProps {
   name: string;
@@ -107,14 +108,14 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-    fontFamily: 'InstrumentSans_700Bold',
+    fontFamily: fontDisplay,
   },
   name: {
     fontWeight: '700',
     marginBottom: 2,
-    fontFamily: 'InstrumentSans_600SemiBold',
+    fontFamily: fontRounded,
   },
   amount: {
-    fontFamily: 'InstrumentSans_400Regular',
+    fontFamily: fontText,
   },
 });
