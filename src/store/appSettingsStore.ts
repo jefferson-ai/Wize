@@ -8,11 +8,15 @@ interface AppSettingsState {
   currency: string;
   theme: 'light' | 'dark' | 'system';
   isOffline: boolean;
+  lastNotificationViewedAt: string | null;
+  dismissedNotificationIds: string[];
   setOnboarded: (val: boolean) => void;
   setHasSeenWelcomeCarousel: (val: boolean) => void;
   setCurrency: (val: string) => void;
   setTheme: (val: 'light' | 'dark' | 'system') => void;
   setIsOffline: (status: boolean) => void;
+  setLastNotificationViewedAt: (val: string) => void;
+  dismissNotification: (id: string) => void;
 }
 
 export const useAppSettingsStore = create<AppSettingsState>()(
@@ -23,11 +27,17 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       currency: '$',
       theme: 'system',
       isOffline: false,
+      lastNotificationViewedAt: null,
+      dismissedNotificationIds: [],
       setOnboarded: (val) => set({ isOnboarded: val }),
       setHasSeenWelcomeCarousel: (val) => set({ hasSeenWelcomeCarousel: val }),
       setCurrency: (val) => set({ currency: val }),
       setTheme: (val) => set({ theme: val }),
       setIsOffline: (status) => set({ isOffline: status }),
+      setLastNotificationViewedAt: (val) => set({ lastNotificationViewedAt: val }),
+      dismissNotification: (id) => set((state) => ({ 
+        dismissedNotificationIds: [...state.dismissedNotificationIds, id] 
+      })),
     }),
     {
       name: 'app-settings-storage', // unique name

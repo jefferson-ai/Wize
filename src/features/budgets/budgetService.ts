@@ -58,7 +58,8 @@ export async function getBudgetConsumption(userId: string) {
             userBudgets.map(async ({ budget, category }: any) => {
                 const spentResult = await db
                     .select({
-                        totalSpent: sql<number>`SUM(${transactions.amount})`
+                        totalSpent: sql<number>`SUM(${transactions.amount})`,
+                        lastSpentAt: sql<string>`MAX(${transactions.date})`
                     })
                     .from(transactions)
                     .where(
@@ -71,13 +72,15 @@ export async function getBudgetConsumption(userId: string) {
                     );
                 
                 const spent = spentResult[0]?.totalSpent || 0;
+                const updatedAt = spentResult[0]?.lastSpentAt || budget.startDate;
                 
                 return {
                     ...budget,
                     category, // Attach full category object
                     spent,
                     remaining: budget.amount - spent,
-                    percentageUsed: spent > 0 ? (spent / budget.amount) * 100 : 0
+                    percentageUsed: spent > 0 ? (spent / budget.amount) * 100 : 0,
+                    updatedAt
                 };
             })
         );

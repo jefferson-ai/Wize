@@ -7,6 +7,8 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import Confetti, { ConfettiRef } from './Confetti';
 import { getStreakColor } from './StreakBadges';
 import { fontDisplay, fontRounded } from '../theme/fonts';
+import GlassyNavigationTitle from './GlassyNavigationTitle';
+import * as LucideIcons from 'lucide-react-native';
 
 // Context to share swipe position and header data across the app
 export const NavigationPositionContext = createContext<SharedValue<number> | null>(null);
@@ -27,6 +29,9 @@ interface HeaderData {
   streak?: number;
   onStreakPress?: () => void;
   confettiRef?: React.RefObject<ConfettiRef | null>;
+  useGlassyTitle?: boolean;
+  tint?: string;
+  iconName?: keyof typeof LucideIcons;
 }
 
 interface HeaderContextType {
@@ -66,7 +71,7 @@ export const HeaderRegistrar: React.FC<HeaderData & { index: number }> = ({ inde
     if (context) {
       context.setHeaderData(index, data);
     }
-  }, [index, data.title, data.rightElement, data.streak, data.onStreakPress]);
+  }, [index, data.title, data.rightElement, data.streak, data.onStreakPress, data.useGlassyTitle, data.tint, data.iconName]);
 
   return null;
 };
@@ -171,14 +176,23 @@ function HeaderLayer({
   return (
     <Animated.View style={[styles.stackLayer, animeStyle, { backgroundColor: 'transparent' }]}>
       <View style={styles.contentRow}>
-        <Text
-          style={[styles.pageTitle, { color: colors.text }, Platform.OS === 'android' ? { includeFontPadding: false } : null]}
-          accessibilityRole="header"
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {data.title}
-        </Text>
+        {data.useGlassyTitle ? (
+          <GlassyNavigationTitle 
+            title={data.title} 
+            iconName={data.iconName} 
+            tint={data.tint} 
+            style={styles.glassyTitleCenter}
+          />
+        ) : (
+          <Text
+            style={[styles.pageTitle, { color: colors.text }, Platform.OS === 'android' ? { includeFontPadding: false } : null]}
+            accessibilityRole="header"
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {data.title}
+          </Text>
+        )}
 
         <View style={styles.rightActions}>
           {data.streak !== undefined && idx !== 3 && (
@@ -323,5 +337,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: fontRounded,
     lineHeight: 18,
+  },
+  glassyTitleCenter: {
+    marginLeft: 0,
+    marginRight: 'auto', // Push it towards center if standard title was flex: 1
+    flexShrink: 1,
   },
 });

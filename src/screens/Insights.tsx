@@ -19,6 +19,8 @@ import AIAdvisorModal from '../components/AIAdvisorModal';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
+import AIInsightCard from '../components/AIInsightCard';
+import { getSmartInsights, acceptChallenge, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
 
 const { width } = Dimensions.get('window');
 
@@ -35,13 +37,28 @@ export default function InsightsScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null });
   const colors = useThemeColors();
 
   const confettiRef = React.useRef<ConfettiRef>(null);
+  const isInitialSyncDone = React.useRef(false);
   const prevStreak = React.useRef<number | null>(null);
 
   React.useEffect(() => {
-    if (prevStreak.current !== null && streak > prevStreak.current) {
+    // Stage 1: Initial mount (ignore transition from null state)
+    if (prevStreak.current === null) {
+      prevStreak.current = streak;
+      return;
+    }
+
+    // Stage 2: Initial data fetch (ignore transition from 0 to DB value)
+    if (!isInitialSyncDone.current) {
+      prevStreak.current = streak;
+      return;
+    }
+
+    // Stage 3: Normal operation (celebrate increases)
+    if (streak > prevStreak.current) {
       confettiRef.current?.trigger();
     }
     prevStreak.current = streak;
@@ -55,16 +72,23 @@ export default function InsightsScreen({ navigation, route }: any) {
 
   const fetchData = async () => {
     if (!user?.id) return;
-    const [consumption, userStreak, goals, strategiesRes] = await Promise.all([
+    const [consumption, userStreak, goals, strategiesRes, dashInsights] = await Promise.all([
       getBudgetConsumption(user.id),
       getLoggingStreak(user.id),
       getSavingGoals(user.id),
-      getSavingsStrategies(user.id)
+      getSavingsStrategies(user.id),
+      getSmartInsights(user.id)
     ]);
     setBudgets(consumption);
     setStreak(userStreak);
+    // Explicitly mark initial sync as done to prevent confetti on startup
+    if (!isInitialSyncDone.current) {
+      prevStreak.current = userStreak;
+      isInitialSyncDone.current = true;
+    }
     setSavingGoals(goals);
     setStrategies(strategiesRes);
+    setInsights(dashInsights);
   };
 
   const onRefresh = async () => {
@@ -78,6 +102,24 @@ export default function InsightsScreen({ navigation, route }: any) {
       navigation.navigate('AddBudget');
     } else {
       navigation.navigate('AddSavingGoal');
+    }
+  };
+
+  const handleAcceptChallenge = async (ch: SavingsChallenge) => {
+    if (!user?.id) return;
+    try {
+      await acceptChallenge(user.id, ch);
+      await fetchData();
+    } catch (error) {
+       console.error('Failed to accept challenge');
+    }
+  };
+
+  const handleDismissInsight = (type: 'anomaly' | 'challenge', id: string) => {
+    if (type === 'anomaly') {
+      setInsights(prev => ({ ...prev, anomalies: prev.anomalies.filter(a => a.id !== id) }));
+    } else {
+      setInsights(prev => ({ ...prev, recommendedChallenge: null }));
     }
   };
 
@@ -263,6 +305,9 @@ export default function InsightsScreen({ navigation, route }: any) {
         </TouchableOpacity>
       </View>
 
+
+
+
       {/* Segmented Control */}
       <View style={styles.tabsWrapper}>
         <View style={[styles.tabsContainer, { backgroundColor: colors.border }]}>
@@ -287,28 +332,58 @@ export default function InsightsScreen({ navigation, route }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
         {activeTab === 'budgets' ? (
-          budgets.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View style={[styles.emptyIcon, { backgroundColor: colors.border }]}>
-                <Plus size={30} color={colors.text} opacity={0.7} />
+          <View>
+            {/* Recommended Challenge Invitation */}
+            {insights.recommendedChallenge && (
+              <View style={{ marginBottom: 20 }}>
+                <AIInsightCard
+                  type="challenge"
+                  title="AI Recommendation"
+                  description={insights.recommendedChallenge.description}
+                  color="#6366f1"
+                  onAccept={() => handleAcceptChallenge(insights.recommendedChallenge!)}
+                  onDismiss={() => handleDismissInsight('challenge', 'rec-challenge')}
+                />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No budgets set yet</Text>
-              <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
-                Create a budget to monitor your spending and avoid going over your limits.
-              </Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('AddBudget')}
-                style={[styles.emptyBtn, { backgroundColor: colors.text }]}
-              >
-                <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create First Budget</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View>
-              <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Active Targets</Text>
-              {budgets.map(renderBudgetCard)}
-            </View>
-          )
+            )}
+
+            {budgets.length === 0 && insights.activeChallenges.length === 0 ? (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIcon, { backgroundColor: colors.border }]}>
+                  <Plus size={30} color={colors.text} opacity={0.7} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No targets set yet</Text>
+                <Text style={[styles.emptyBody, { color: colors.textMuted }]}>
+                  Create a budget or accept an AI challenge to monitor your financial progress.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('AddBudget')}
+                  style={[styles.emptyBtn, { backgroundColor: colors.text }]}
+                >
+                  <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create First Budget</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Active Targets</Text>
+                {budgets.map(renderBudgetCard)}
+                
+                {/* Active Challenges as Targets */}
+                {insights.activeChallenges.map(challenge => (
+                  <AIInsightCard
+                    key={challenge.id}
+                    type="challenge"
+                    title={challenge.title}
+                    description={challenge.description}
+                    color={challenge.currentAmount > (challenge.targetAmount * 0.9) ? colors.warning : colors.success}
+                    progress={Math.min(1, challenge.currentAmount / challenge.targetAmount)}
+                    amountLabel={`${currency} ${formatAmount(challenge.currentAmount)} / ${formatAmount(challenge.targetAmount)}`}
+                    onDismiss={() => {}} 
+                  />
+                ))}
+              </View>
+            )}
+          </View>
         ) : (
           renderSavingsView()
         )}

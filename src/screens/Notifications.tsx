@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
-import { X, Bell, Flame, Wallet, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react-native';
+import { Swipeable, TouchableOpacity as GHTouchableOpacity, RectButton, ScrollView as GHScrollView } from 'react-native-gesture-handler';
+import { X, Bell, Flame, Wallet, CheckCircle2, AlertTriangle, Trash2, Sparkles } from 'lucide-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useAuthStore } from '../store/authStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
+import { getSmartInsights } from '../features/ai/aiService';
 import { formatAmount } from '../utils/formatters';
 import { fontText } from '../theme/fonts';
+import { TabNavigationContext } from '../navigation/navigationContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -12,6 +16,16 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 export default function NotificationsScreen({ navigation }: any) {
   const colors = useThemeColors();
+  const { user } = useAuthStore();
+  const { currency, setLastNotificationViewedAt, dismissedNotificationIds, dismissNotification } = useAppSettingsStore();
+  const tabNav = React.useContext(TabNavigationContext);
+  const [aiNotifications, setAiNotifications] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    // Mark as viewed on mount
+    setLastNotificationViewedAt(new Date().toISOString());
+  }, []);
 
   // Mock Notifications State
   const [items, setItems] = React.useState([
@@ -42,27 +56,90 @@ export default function NotificationsScreen({ navigation }: any) {
       icon: <CheckCircle2 size={18} color="#22c55e" />,
       color: '#22c55e',
     },
-    {
-      id: '4',
-      type: 'wallet',
-      title: 'Weekly Summary Ready',
-      body: 'Your spending summary for last week is now available in the Insights tab.',
-      time: '2d ago',
-      icon: <Wallet size={18} color="#3b82f6" />,
-      color: '#3b82f6',
-    },
   ]);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      loadAiInsights();
+    }
+  }, [user?.id]);
+
+  const loadAiInsights = async () => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      const res = await getSmartInsights(user.id);
+      const newAiNotifs: any[] = [];
+
+      // Map Anomalies
+      res.anomalies.forEach(a => {
+        newAiNotifs.push({
+          id: a.id,
+          type: 'ai-insight',
+          title: 'Spending Spike 🚨',
+          body: `AI detected a spike in ${a.categoryName}. Spending is up by ${a.increasePercentage}% this week.`,
+          time: 'Now',
+          icon: <Sparkles size={18} color="#8b5cf6" />,
+          color: '#8b5cf6',
+          onPress: () => {
+            navigation.goBack();
+            tabNav?.jumpToTab('Planning');
+          }
+        });
+      });
+
+      // Map Recommended Challenge
+      if (res.recommendedChallenge) {
+        const rc = res.recommendedChallenge;
+        newAiNotifs.push({
+          id: rc.id,
+          type: 'ai-insight',
+          title: 'New Savings Challenge ✨',
+          body: rc.description,
+          time: 'New',
+          icon: <Sparkles size={18} color="#6366f1" />,
+          color: '#6366f1',
+          onPress: () => {
+            navigation.goBack();
+            tabNav?.jumpToTab('Planning');
+          }
+        });
+      }
+
+      setAiNotifications(newAiNotifs);
+    } catch (err) {
+      console.error('Failed to load AI insights for notifications', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const allItems = [...aiNotifications, ...items].filter(item => !dismissedNotificationIds.includes(item.id));
 
   const handleDismiss = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    dismissNotification(id);
     setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const renderRightActions = (id: string) => (
-    <View style={[styles.deleteAction, { backgroundColor: colors.dangerBg }]}>
-      <Trash2 size={20} color={colors.danger} />
-    </View>
-  );
+  const renderRightActions = (id: string, progress: any) => {
+    const scale = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.8, 1],
+    });
+
+    return (
+      <GHTouchableOpacity 
+        activeOpacity={0.6}
+        onPress={() => handleDismiss(id)}
+        style={[styles.deleteAction, { backgroundColor: colors.dangerBg }]}
+      >
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Trash2 size={22} color={colors.danger} />
+        </Animated.View>
+      </GHTouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -76,21 +153,26 @@ export default function NotificationsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {items.map((item, index) => (
+      <GHScrollView 
+        contentContainerStyle={styles.scrollContent}
+        waitFor={Platform.OS === 'ios' ? [] : []} // Can be used to sync with other gestures if needed
+      >
+        {allItems.map((item, index) => (
           <Swipeable
             key={item.id}
-            renderRightActions={() => renderRightActions(item.id)}
-            onSwipeableOpen={() => handleDismiss(item.id)}
-            friction={2}
-            rightThreshold={80}
+            renderRightActions={(progress) => renderRightActions(item.id, progress)}
+            friction={1.5}
+            rightThreshold={30}
+            activeOffsetX={[-5, 5]} // Capture horizontal movement immediately
+            failOffsetY={[-5, 5]}   // Fail swipe if vertical movement starts first
           >
-            <TouchableOpacity 
-              activeOpacity={0.8}
+            <RectButton 
+              onPress={item.onPress}
+              rippleColor={colors.border}
               style={[
                 styles.notificationItem, 
                 { backgroundColor: colors.card },
-                index === 0 && { borderLeftWidth: 3, borderLeftColor: colors.primary }
+                (item.type === 'ai-insight' || index === 0) && { borderLeftWidth: 3, borderLeftColor: item.color || colors.primary }
               ]}
             >
               <View style={[styles.iconWrapper, { backgroundColor: item.color + '15' }]}>
@@ -105,11 +187,11 @@ export default function NotificationsScreen({ navigation }: any) {
                   {item.body}
                 </Text>
               </View>
-            </TouchableOpacity>
+            </RectButton>
           </Swipeable>
         ))}
 
-        {items.length === 0 && (
+        {allItems.length === 0 && !loading && (
           <View style={styles.emptyState}>
             <Bell size={48} color={colors.textMuted} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>No new notifications</Text>
@@ -118,7 +200,7 @@ export default function NotificationsScreen({ navigation }: any) {
             </Text>
           </View>
         )}
-      </ScrollView>
+      </GHScrollView>
     </SafeAreaView>
   );
 }

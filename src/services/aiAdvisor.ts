@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabase';
 import { getTransactions } from '../features/transactions/transactionService';
 import { getBudgetConsumption } from '../features/budgets/budgetService';
 import { getSavingGoals } from '../features/savings/savingsService';
+import { getSmartInsights } from '../features/ai/aiService';
 
 // Set to false for live mode
 const MOCK_MODE = false;
@@ -34,10 +35,11 @@ export const getAIAdvice = async (userId: string): Promise<AIAdvice> => {
 
   try {
     // 1. Gather Context
-    const [transactions, budgets, goals] = await Promise.all([
+    const [transactions, budgets, goals, smartInsights] = await Promise.all([
       getTransactions(userId, { limit: 40 }),
       getBudgetConsumption(userId),
-      getSavingGoals(userId)
+      getSavingGoals(userId),
+      getSmartInsights(userId)
     ]);
 
     // 2. Format Context for the Edge Function
@@ -59,6 +61,11 @@ export const getAIAdvice = async (userId: string): Promise<AIAdvice> => {
         name: g.name,
         target: g.targetAmount,
         current: g.currentAmount
+      })),
+      detectedAnomalies: smartInsights.anomalies.map(a => ({
+        category: a.categoryName,
+        increasePercentage: a.increasePercentage,
+        amountDifference: a.amountDifference
       }))
     };
 

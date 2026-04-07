@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated } from 'react-native';
-import { X, Sparkles, CheckCircle2, TrendingUp, Heart } from 'lucide-react-native';
+import { X, Sparkles, CheckCircle2, TrendingUp, Heart, AlertTriangle } from 'lucide-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getAIAdvice, AIAdvice } from '../services/aiAdvisor';
+import { getSmartInsights, AnomalyAlert } from '../features/ai/aiService';
+import { formatAmount } from '../utils/formatters';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { fontDisplay, fontText } from '../theme/fonts';
 
 interface AIAdvisorModalProps {
@@ -13,8 +16,10 @@ interface AIAdvisorModalProps {
 
 export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisorModalProps) {
   const colors = useThemeColors();
+  const { currency } = useAppSettingsStore();
   const [loading, setLoading] = useState(true);
   const [advice, setAdvice] = useState<AIAdvice | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomalyAlert[]>([]);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -33,8 +38,12 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
     
     try {
       setLoading(true);
-      const res = await getAIAdvice(userId);
+      const [res, insights] = await Promise.all([
+        getAIAdvice(userId),
+        getSmartInsights(userId)
+      ]);
       setAdvice(res);
+      setAnomalies(insights.anomalies);
       setLoading(false);
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -86,6 +95,26 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
                    </View>
                    <Text style={[styles.summaryText, { color: colors.text }]}>{advice?.summary}</Text>
                 </View>
+
+                {/* Anomalies Section (New) */}
+                {anomalies.length > 0 && (
+                  <View style={{ marginBottom: 24 }}>
+                    <Text style={[styles.label, { color: colors.danger, marginBottom: 12 }]}>Critical Alerts</Text>
+                    {anomalies.map(a => (
+                      <View key={a.id} style={[styles.anomalyAlert, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '20' }]}>
+                        <View style={styles.anomalyIcon}>
+                          <AlertTriangle size={18} color={colors.danger} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.anomalyTitle, { color: colors.text }]}>Spending Spike: {a.categoryName}</Text>
+                          <Text style={[styles.anomalyBody, { color: colors.textMuted }]}>
+                            Detected a {a.increasePercentage}% increase ({currency} {formatAmount(a.amountDifference)}) compared to last week.
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
                 {/* Action Items Section */}
                 <Text style={[styles.label, { color: colors.textMuted }]}>Actionable Steps</Text>
@@ -142,4 +171,8 @@ const styles = StyleSheet.create({
   encouragementText: { fontSize: 16, fontStyle: 'italic', textAlign: 'center', lineHeight: 24, opacity: 0.9, fontFamily: fontText },
   refreshBtn: { width: '100%', paddingVertical: 16, borderRadius: 16, borderWidth: 1, alignItems: 'center', marginTop: 8 },
   refreshBtnText: { fontSize: 14, fontWeight: '600', fontFamily: fontText },
+  anomalyAlert: { flexDirection: 'row', padding: 16, borderRadius: 20, borderWidth: 1, marginBottom: 8, alignItems: 'center' },
+  anomalyIcon: { marginRight: 12 },
+  anomalyTitle: { fontSize: 14, fontWeight: '700', fontFamily: fontText, marginBottom: 2 },
+  anomalyBody: { fontSize: 12, fontFamily: fontText, lineHeight: 18 },
 });

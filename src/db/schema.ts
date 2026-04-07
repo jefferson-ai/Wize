@@ -56,3 +56,18 @@ export const savingGoals = sqliteTable('saving_goals', {
   icon: text('icon').notNull(),
   color: text('color').notNull(),
 });
+
+export const challenges = sqliteTable('challenges', {
+  id: text('id').primaryKey(),
+  userId: text('user_id'),
+  type: text('type').notNull(), // 'reduced_spending', 'no_spend'
+  categoryId: text('category_id').references(() => categories.id),
+  targetAmount: real('target_amount').notNull(),
+  currentAmount: real('current_amount').default(0).notNull(),
+  status: text('status', { enum: ['active', 'completed', 'failed'] }).default('active').notNull(),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});

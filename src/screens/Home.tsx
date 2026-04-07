@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Actio
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { PieChart } from 'react-native-gifted-charts';
-import { Eye, EyeOff, ArrowUpRight, ChevronDown, Flame, Bell, Sparkles } from 'lucide-react-native';
+import { Eye, EyeOff, ArrowUpRight, ChevronDown, Flame, Sparkles } from 'lucide-react-native';
 
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -18,16 +18,19 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import StreakBadges, { getStreakColor } from '../components/StreakBadges';
 import Confetti, { ConfettiRef } from '../components/Confetti';
 import SavingBucket from '../components/SavingBucket';
+import ShakingBell from '../components/ShakingBell';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { TabNavigationContext } from '../navigation/navigationContext';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
+import AIInsightCard from '../components/AIInsightCard';
+import { getSmartInsights, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
 
 const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { user } = useAuthStore();
-  const { currency } = useAppSettingsStore();
+  const { currency, lastNotificationViewedAt, dismissedNotificationIds } = useAppSettingsStore();
 
   const [summary, setSummary] = useState({ balance: 0, income: 0, expense: 0, categoryData: [] as any[] });
   const [totalBalance, setTotalBalance] = useState(0);
@@ -40,6 +43,7 @@ export default function HomeScreen({ navigation }: any) {
   const [streak, setStreak] = useState(0);
   const [hasLoggedToday, setHasLoggedToday] = useState(true);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
+  const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null });
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -49,10 +53,27 @@ export default function HomeScreen({ navigation }: any) {
   const tabNav = React.useContext(TabNavigationContext);
   
   const confettiRef = React.useRef<ConfettiRef>(null);
+  const isInitialSyncDone = React.useRef(false);
   const prevStreak = React.useRef<number | null>(null);
 
   React.useEffect(() => {
-    if (prevStreak.current !== null && streak > prevStreak.current) {
+    // If we haven't seen any streak yet, just record it
+    if (prevStreak.current === null) {
+      prevStreak.current = streak;
+      return;
+    }
+
+    // Ignore the very first time we sync from the database
+    if (!isInitialSyncDone.current) {
+      prevStreak.current = streak;
+      if (streak > 0) {
+        isInitialSyncDone.current = true;
+      }
+      return;
+    }
+
+    // Now we can trigger on legitimate increases
+    if (streak > prevStreak.current) {
       confettiRef.current?.trigger();
     }
     prevStreak.current = streak;
@@ -70,7 +91,7 @@ export default function HomeScreen({ navigation }: any) {
     if (!user?.id) return;
     await ensureDefaultAccount(user.id, currency);
 
-    const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, strategiesRes] = await Promise.all([
+    const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, strategiesRes, smartInsights] = await Promise.all([
       getDashboardSummary(user.id, selectedAccountId || undefined),
       getTotalBalance(user.id),
       getAccounts(user.id),
@@ -79,7 +100,8 @@ export default function HomeScreen({ navigation }: any) {
       getLoggingStreak(user.id),
       checkLoggedToday(user.id),
       getSavingGoals(user.id),
-      getSavingsStrategies(user.id)
+      getSavingsStrategies(user.id),
+      getSmartInsights(user.id)
     ]);
     setSummary(dashSummary as any);
     setTotalBalance(total);
@@ -87,9 +109,15 @@ export default function HomeScreen({ navigation }: any) {
     setRecentTx(recent);
     setAllBudgets(consumption.sort((a, b) => b.percentageUsed - a.percentageUsed).slice(0, 4));
     setStreak(userStreak);
+    // Explicitly mark initial sync as done once we've fetched from DB
+    if (!isInitialSyncDone.current) {
+      prevStreak.current = userStreak;
+      isInitialSyncDone.current = true;
+    }
     setHasLoggedToday(loggedToday);
     setSavingGoals(goals);
     setStrategies(strategiesRes);
+    setInsights(smartInsights);
     
     const criticalBudgets = consumption
        .filter(b => b.percentageUsed >= 80)
@@ -153,8 +181,10 @@ export default function HomeScreen({ navigation }: any) {
   return (
     <View style={[styles.screen, { flex: 1, backgroundColor: 'transparent' }]}>
       <HeaderRegistrar 
-        title="Home" 
+        title="Dashboard" 
         index={0}
+        useGlassyTitle={true}
+        iconName="Sparkles"
         streak={streak}
         onStreakPress={() => setStreakModalVisible(true)}
         confettiRef={confettiRef}
@@ -164,8 +194,26 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Notifications')}
             style={[styles.bellBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
-            <Bell size={20} color={colors.text} />
-            {budgetAlerts.length > 0 && <View style={styles.notifBadge} />}
+            <ShakingBell 
+              size={20} 
+              color={colors.text} 
+              shouldShake={!!(
+                (budgetAlerts.filter(b => !dismissedNotificationIds.includes(`budget-${b.id}`)).length > 0 || 
+                 insights.anomalies.filter(a => !dismissedNotificationIds.includes(a.id)).length > 0 ||
+                 (insights.recommendedChallenge && !dismissedNotificationIds.includes(insights.recommendedChallenge.id))) && 
+                (!lastNotificationViewedAt || (
+                  insights.anomalies.some(a => new Date(a.createdAt).getTime() > new Date(lastNotificationViewedAt).getTime()) ||
+                  budgetAlerts.some(b => b.updatedAt && new Date(b.updatedAt).getTime() > new Date(lastNotificationViewedAt).getTime())
+                ))
+              )} 
+            />
+            {!!((budgetAlerts.filter(b => !dismissedNotificationIds.includes(`budget-${b.id}`)).length > 0 || 
+               insights.anomalies.filter(a => !dismissedNotificationIds.includes(a.id)).length > 0 ||
+               (insights.recommendedChallenge && !dismissedNotificationIds.includes(insights.recommendedChallenge.id))) && 
+              (!lastNotificationViewedAt || (
+                insights.anomalies.some(a => new Date(a.createdAt).getTime() > new Date(lastNotificationViewedAt).getTime()) ||
+                budgetAlerts.some(b => b.updatedAt && new Date(b.updatedAt).getTime() > new Date(lastNotificationViewedAt).getTime())
+              ))) && <View style={styles.notifBadge} />}
           </TouchableOpacity>
         }
       />
@@ -265,6 +313,8 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
+
+
         <View style={styles.section}>
           <View style={[styles.chartCard, { backgroundColor: colors.card }]}>
             <View style={styles.chartHeader}>
@@ -350,26 +400,39 @@ export default function HomeScreen({ navigation }: any) {
               {allBudgets.map((budget, idx) => {
                 const pUsed = Math.min(budget.percentageUsed, 100);
                 const barColor = budget.category?.color || colors.primary;
+                const isOver = budget.percentageUsed >= 100;
+                const isWarn = budget.percentageUsed >= 85;
                 
                 return (
                   <View key={budget.id}>
                     <TouchableOpacity 
                       activeOpacity={0.7}
                       onPress={() => navigation.navigate('EditBudget', { budgetToEdit: budget })}
-                      style={styles.budgetRow}
+                      style={[
+                        styles.budgetRow, 
+                        isOver && { borderLeftWidth: 3, borderLeftColor: colors.danger, paddingLeft: 12 },
+                        isWarn && !isOver && { borderLeftWidth: 3, borderLeftColor: colors.warning, paddingLeft: 12 }
+                      ]}
                     >
                       <View style={styles.budgetRowTop}>
                         <View style={styles.budgetRowLeft}>
                           <Text style={{ fontSize: 18, marginRight: 8 }}>{getCategoryEmoji(budget.category?.name)}</Text>
-                          <Text style={[styles.budgetName, { color: colors.text }]}>{budget.category?.name || 'Budget'}</Text>
+                          <View>
+                            <Text style={[styles.budgetName, { color: colors.text }]}>{budget.category?.name || 'Budget'}</Text>
+                            {(isOver || isWarn) && (
+                              <Text style={[styles.inlineAlertText, { color: isOver ? colors.danger : colors.warning }]}>
+                                {isOver ? 'Limit Exceeded' : 'Nearing Limit'}
+                              </Text>
+                            )}
+                          </View>
                         </View>
-                        <Text style={[styles.budgetRemain, { color: colors.textMuted }]}>
-                          {currency} {formatAmount(budget.remaining)} left
+                        <Text style={[styles.budgetRemain, { color: isOver ? colors.danger : colors.textMuted }]}>
+                          {isOver ? `-${currency} ${formatAmount(budget.spent - budget.amount)}` : `${currency} ${formatAmount(budget.remaining)} left`}
                         </Text>
                       </View>
                       
                       <View style={[styles.miniProgressTrack, { backgroundColor: colors.background }]}>
-                        <View style={[styles.miniProgressFill, { width: `${pUsed}%`, backgroundColor: barColor }]} />
+                        <View style={[styles.miniProgressFill, { width: `${pUsed}%`, backgroundColor: isOver ? colors.danger : isWarn ? colors.warning : barColor }]} />
                       </View>
                     </TouchableOpacity>
                     {idx < allBudgets.length - 1 && <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />}
@@ -380,41 +443,43 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* Budget Alerts */}
-        {budgetAlerts.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Budget Alerts</Text>
-            {budgetAlerts.map(budget => {
-              const pUsed = budget.percentageUsed;
-              const isOver = pUsed >= 100;
-              return (
-                <View
-                  key={budget.id}
-                  accessibilityRole="alert"
-                  style={[
-                    styles.alertCard,
-                    { 
-                      backgroundColor: isOver ? colors.danger + '12' : colors.warning + '12',
-                      borderColor: isOver ? colors.danger + '33' : colors.warning + '33' 
-                    }
-                  ]}
-                >
-                  <View style={[styles.alertIcon, { backgroundColor: (budget.category?.color || colors.textMuted) + '22' }]}>
-                    <Text style={{ fontSize: 18 }}>{getCategoryEmoji(budget.category?.name)}</Text>
+        {/* Challenge Progress Bar */}
+        {insights.activeChallenges.length > 0 && (
+          <View style={styles.sectionSmall}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Ongoing Challenges</Text>
+              <Sparkles size={16} color={colors.primary} />
+            </View>
+            <View style={[styles.challengeProgressCard, { backgroundColor: colors.card }]}>
+              {insights.activeChallenges.map((challenge, idx) => {
+                const pct = Math.min(1, challenge.currentAmount / challenge.targetAmount);
+                return (
+                  <View key={challenge.id}>
+                    <TouchableOpacity 
+                      activeOpacity={0.7}
+                      onPress={() => tabNav?.jumpToTab('Planning')}
+                      style={styles.challengeRow}
+                    >
+                      <View style={styles.challengeRowTop}>
+                         <Text style={[styles.challengeName, { color: colors.text }]}>{challenge.title}</Text>
+                         <Text style={[styles.challengePct, { color: colors.primary }]}>{(pct * 100).toFixed(0)}%</Text>
+                      </View>
+                      <View style={[styles.miniProgressTrack, { backgroundColor: colors.background }]}>
+                        <View style={[styles.miniProgressFill, { width: `${pct * 100}%`, backgroundColor: colors.primary }]} />
+                      </View>
+                      <Text style={[styles.challengeProgressText, { color: colors.textMuted }]}>
+                        {currency} {formatAmount(challenge.currentAmount)} of {formatAmount(challenge.targetAmount)}
+                      </Text>
+                    </TouchableOpacity>
+                    {idx < insights.activeChallenges.length - 1 && <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.alertTitle, { color: isOver ? colors.danger : colors.warning }]}>
-                      {isOver ? `Budget Exceeded by ${currency} ${formatAmount(budget.spent - budget.amount)}` : 'Nearing Limit'}
-                    </Text>
-                    <Text style={[styles.alertBody, { color: colors.text }]}>
-                      {budget.category?.name || 'Category'}: {pUsed.toFixed(0)}% used
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </View>
           </View>
         )}
+
+
 
         {/* Recent Transactions */}
         <View style={styles.section}>
@@ -460,8 +525,8 @@ export default function HomeScreen({ navigation }: any) {
             ))
           )}
         </View>
-        </View>
-      </ScrollView>
+      </View>
+    </ScrollView>
 
       <StreakBadges 
         streak={streak} 
@@ -564,8 +629,18 @@ const styles = StyleSheet.create({
   budgetRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   budgetRowLeft: { flexDirection: 'row', alignItems: 'center' },
   budgetName: { fontSize: 14, fontWeight: '600', fontFamily: fontText },
+  inlineAlertText: { fontSize: 10, fontWeight: '700', marginTop: 1, fontFamily: fontRounded, textTransform: 'uppercase' },
   budgetRemain: { fontSize: 12, fontFamily: fontText },
   miniProgressTrack: { height: 4, borderRadius: 2, overflow: 'hidden' },
   miniProgressFill: { height: '100%', borderRadius: 2 },
   rowDivider: { height: 1, opacity: 0.3 },
+
+  // Challenges
+  sectionSmall: { paddingHorizontal: 20, marginTop: 22 },
+  challengeProgressCard: { borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
+  challengeRow: { paddingVertical: 10 },
+  challengeRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  challengeName: { fontSize: 13, fontWeight: '700', fontFamily: fontDisplay },
+  challengePct: { fontSize: 12, fontWeight: '800', fontFamily: fontRounded },
+  challengeProgressText: { fontSize: 11, color: '#9aa2ad', marginTop: 8, fontFamily: fontText },
 });
