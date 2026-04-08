@@ -23,6 +23,8 @@ export interface SavingsChallenge {
   targetAmount: number;
   currentAmount: number;
   daysRemaining: number;
+  currentDay: number;
+  totalDays: number;
   title: string;
   description: string;
   isCustom?: boolean;
@@ -173,6 +175,8 @@ async function getRecommendedChallenge(userId: string): Promise<SavingsChallenge
         targetAmount: target,
         currentAmount: 0,
         daysRemaining: 7,
+        currentDay: 1,
+        totalDays: 7,
         title: `Spend less on ${topCat.name}`,
         description: `Try to keep your ${topCat.name} spending under GHS ${target} for the next 7 days.`
       };
@@ -224,6 +228,8 @@ export async function getActiveChallenges(userId: string) {
         targetAmount: ch.targetAmount,
         currentAmount: currentSpent,
         daysRemaining: Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+        currentDay: Math.min(Math.floor((now.getTime() - new Date(ch.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1, Math.round((endDate.getTime() - new Date(ch.startDate).getTime()) / (1000 * 60 * 60 * 24))),
+        totalDays: Math.round((endDate.getTime() - new Date(ch.startDate).getTime()) / (1000 * 60 * 60 * 24)),
         title: ch.title,
         description: ch.description || '',
         isCustom: true

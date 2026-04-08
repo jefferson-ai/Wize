@@ -21,7 +21,6 @@ export type OnboardingStackParamList = {
   FeatureIntro: undefined;
   CurrencySetup: undefined;
   AccountSetup: undefined;
-  FinancialGoalsSetup: undefined;
 };
 
 export type MainTabParamList = {

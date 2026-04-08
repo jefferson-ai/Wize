@@ -7,7 +7,7 @@ import { useAppSettingsStore } from '../store/appSettingsStore';
 import { getBudgetConsumption } from '../features/budgets/budgetService';
 import { getCategories } from '../features/categories/categoryService';
 import { getLoggingStreak } from '../features/transactions/transactionService';
-import { getSavingGoals, getSavingsStrategies } from '../features/savings/savingsService';
+import { getSavingGoals } from '../features/savings/savingsService';
 import { formatAmount } from '../utils/formatters';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -32,7 +32,6 @@ export default function InsightsScreen({ navigation, route }: any) {
   const [activeTab, setActiveTab] = useState<'budgets' | 'savings'>(route?.params?.initialTab || 'budgets');
   const [budgets, setBudgets] = useState<any[]>([]);
   const [savingGoals, setSavingGoals] = useState<any[]>([]);
-  const [strategies, setStrategies] = useState({ spareChange: 0, multiplier: 0, transactionCount: 0 });
   const [streak, setStreak] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
@@ -72,11 +71,10 @@ export default function InsightsScreen({ navigation, route }: any) {
 
   const fetchData = async () => {
     if (!user?.id) return;
-    const [consumption, userStreak, goals, strategiesRes, dashInsights] = await Promise.all([
+    const [consumption, userStreak, goals, dashInsights] = await Promise.all([
       getBudgetConsumption(user.id),
       getLoggingStreak(user.id),
       getSavingGoals(user.id),
-      getSavingsStrategies(user.id),
       getSmartInsights(user.id)
     ]);
     setBudgets(consumption);
@@ -87,7 +85,6 @@ export default function InsightsScreen({ navigation, route }: any) {
       isInitialSyncDone.current = true;
     }
     setSavingGoals(goals);
-    setStrategies(strategiesRes);
     setInsights(dashInsights);
   };
 
@@ -184,45 +181,6 @@ export default function InsightsScreen({ navigation, route }: any) {
 
   const renderSavingsView = () => (
     <View>
-      {/* Strategies Summary */}
-      <View style={styles.strategiesContainer}>
-        <View style={[
-          styles.strategyCard, 
-          { 
-            backgroundColor: colors.isDark ? 'rgba(3, 105, 161, 0.15)' : '#f0f9ff', 
-            borderColor: colors.isDark ? 'rgba(3, 105, 161, 0.3)' : '#bae6fd' 
-          }
-        ]}>
-          <View style={[styles.strategyIconWrap, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : '#ffffff' }]}>
-            <Sparkles size={16} color={colors.isDark ? '#7dd3fc' : "#0369a1"} />
-          </View>
-          <Text style={[styles.strategyLabel, { color: colors.isDark ? '#7dd3fc' : '#0369a1' }]}>Spare Change</Text>
-          <Text style={[styles.strategyAmount, { color: colors.text }]}>{currency} {formatAmount(strategies.spareChange)}</Text>
-          <Text style={[styles.strategyDetail, { color: colors.textMuted }]}>Round-ups this month</Text>
-        </View>
-        
-        <View style={[
-          styles.strategyCard, 
-          { 
-            backgroundColor: colors.isDark ? 'rgba(162, 28, 175, 0.15)' : '#fdf4ff', 
-            borderColor: colors.isDark ? 'rgba(162, 28, 175, 0.3)' : '#f5d0fe' 
-          }
-        ]}>
-          <View style={[styles.strategyIconWrap, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : '#ffffff' }]}>
-            <TrendingUp size={16} color={colors.isDark ? '#f0abfc' : "#a21caf"} />
-          </View>
-          <Text style={[styles.strategyLabel, { color: colors.isDark ? '#f0abfc' : '#a21caf' }]}>Steady Growth</Text>
-          <Text style={[styles.strategyAmount, { color: colors.text }]}>{currency} {formatAmount(strategies.multiplier)}</Text>
-          <Text style={[styles.strategyDetail, { color: colors.textMuted }]}>Multiplier this month</Text>
-        </View>
-      </View>
-
-      <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-        <Info size={14} color={colors.textMuted} />
-        <Text style={[styles.statText, { color: colors.textMuted }]}>
-           Based on your {strategies.transactionCount} purchases this month
-        </Text>
-      </View>
 
       <Text style={[styles.sectionLabel, { color: colors.textMuted, marginTop: 10 }]}>Active Bucket Goals</Text>
       
@@ -343,6 +301,8 @@ export default function InsightsScreen({ navigation, route }: any) {
                   color="#6366f1"
                   onAccept={() => handleAcceptChallenge(insights.recommendedChallenge!)}
                   onDismiss={() => handleDismissInsight('challenge', 'rec-challenge')}
+                  currentDay={insights.recommendedChallenge.currentDay}
+                  totalDays={insights.recommendedChallenge.totalDays}
                 />
               </View>
             )}
@@ -378,6 +338,8 @@ export default function InsightsScreen({ navigation, route }: any) {
                     color={challenge.currentAmount > (challenge.targetAmount * 0.9) ? colors.warning : colors.success}
                     progress={Math.min(1, challenge.currentAmount / challenge.targetAmount)}
                     amountLabel={`${currency} ${formatAmount(challenge.currentAmount)} / ${formatAmount(challenge.targetAmount)}`}
+                    currentDay={challenge.currentDay}
+                    totalDays={challenge.totalDays}
                     onDismiss={() => {}} 
                   />
                 ))}
@@ -444,16 +406,6 @@ const styles = StyleSheet.create({
   progressFooter: { flexDirection: 'row', justifyContent: 'space-between' },
   progressPct: { fontSize: 11, color: '#9aa2ad', fontFamily: fontText },
   progressStatus: { fontSize: 11, fontWeight: '600', color: '#9aa2ad', fontFamily: fontText },
-
-  strategiesContainer: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  strategyCard: { flex: 1, padding: 16, borderRadius: 24, borderWidth: 1 },
-  strategyIconWrap: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  strategyLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, fontFamily: fontText },
-  strategyAmount: { fontSize: 18, fontWeight: '800', marginBottom: 4, fontFamily: fontDisplay },
-  strategyDetail: { fontSize: 9, fontFamily: fontText },
-
-  statBox: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, marginBottom: 20, gap: 8 },
-  statText: { fontSize: 11, fontFamily: fontText },
 
   goalsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   goalCard: { width: (width - 56) / 2, padding: 20, borderRadius: 24, marginBottom: 16, alignItems: 'center' },

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dim
 import { X, Plus, Target, Sparkles, TrendingUp, Info } from 'lucide-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useAuthStore } from '../store/authStore';
-import { getSavingGoals, getSavingsStrategies } from '../features/savings/savingsService';
+import { getSavingGoals } from '../features/savings/savingsService';
 import SavingBucket from '../components/SavingBucket';
 import { useFocusEffect } from '@react-navigation/native';
 import { formatAmount } from '../utils/formatters';
@@ -16,7 +16,6 @@ export default function SavingsGoalsScreen({ navigation }: any) {
   const { user } = useAuthStore();
   
   const [goals, setGoals] = useState<any[]>([]);
-  const [strategies, setStrategies] = useState({ spareChange: 0, multiplier: 0, transactionCount: 0 });
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -29,12 +28,8 @@ export default function SavingsGoalsScreen({ navigation }: any) {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const [userGoals, userStrategies] = await Promise.all([
-        getSavingGoals(user.id),
-        getSavingsStrategies(user.id)
-      ]);
+      const userGoals = await getSavingGoals(user.id);
       setGoals(userGoals);
-      setStrategies(userStrategies);
     } catch (err) {
       console.error(err);
     } finally {
@@ -62,54 +57,6 @@ export default function SavingsGoalsScreen({ navigation }: any) {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Dual Strategies Comparison */}
-        <View style={styles.strategiesHeader}>
-          <Text style={[styles.strategiesLabel, { color: colors.textMuted }]}>Saving Opportunity</Text>
-          <Text style={[styles.strategiesTitle, { color: colors.text }]}>Which strategy fits you?</Text>
-        </View>
-
-        <View style={styles.strategiesContainer}>
-          {/* Strategy A: Spare Change */}
-          <View style={[
-            styles.strategyCard, 
-            { 
-              backgroundColor: colors.isDark ? 'rgba(3, 105, 161, 0.15)' : '#f0f9ff', 
-              borderColor: colors.isDark ? 'rgba(3, 105, 161, 0.3)' : '#bae6fd' 
-            }
-          ]}>
-            <View style={[styles.strategyIconWrap, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : '#ffffff' }]}>
-              <Sparkles size={18} color={colors.isDark ? '#7dd3fc' : '#0369a1'} />
-            </View>
-            <Text style={[styles.strategyLabel, { color: colors.isDark ? '#7dd3fc' : '#0369a1' }]}>Option A</Text>
-            <Text style={[styles.strategyName, { color: colors.text }]}>Spare Change</Text>
-            <Text style={[styles.strategyAmount, { color: colors.text }]}>GHS {formatAmount(strategies.spareChange)}</Text>
-            <Text style={[styles.strategyDetail, { color: colors.textMuted }]}>Rounding up to nearest GHS 1.00 this month</Text>
-          </View>
-
-          {/* Strategy B: Multiplier */}
-          <View style={[
-            styles.strategyCard, 
-            { 
-              backgroundColor: colors.isDark ? 'rgba(162, 28, 175, 0.15)' : '#fdf4ff', 
-              borderColor: colors.isDark ? 'rgba(162, 28, 175, 0.3)' : '#f5d0fe' 
-            }
-          ]}>
-            <View style={[styles.strategyIconWrap, { backgroundColor: colors.isDark ? 'rgba(255,255,255,0.1)' : '#ffffff' }]}>
-              <TrendingUp size={18} color={colors.isDark ? '#f0abfc' : '#a21caf'} />
-            </View>
-            <Text style={[styles.strategyLabel, { color: colors.isDark ? '#f0abfc' : '#a21caf' }]}>Option B</Text>
-            <Text style={[styles.strategyName, { color: colors.text }]}>Steady Growth</Text>
-            <Text style={[styles.strategyAmount, { color: colors.text }]}>GHS {formatAmount(strategies.multiplier)}</Text>
-            <Text style={[styles.strategyDetail, { color: colors.textMuted }]}>Saving fixed GHS 2.00 per purchase this month</Text>
-          </View>
-        </View>
-
-        <View style={[styles.statBox, { backgroundColor: colors.card }]}>
-          <Info size={16} color={colors.textMuted} />
-          <Text style={[styles.statText, { color: colors.textMuted }]}>
-             Based on your {strategies.transactionCount} purchases this month
-          </Text>
-        </View>
 
         {/* Goals Grid */}
         <View style={styles.sectionHeader}>
@@ -206,78 +153,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
-  },
-  strategiesHeader: {
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  strategiesLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  strategiesTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    fontFamily: fontText,
-  },
-  strategiesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  strategyCard: {
-    width: (width - 50) / 2,
-    padding: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-  },
-  strategyIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  strategyLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  strategyName: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: fontText,
-    marginBottom: 8,
-  },
-  strategyAmount: {
-    fontSize: 20,
-    fontWeight: '800',
-    fontFamily: fontText,
-    marginBottom: 8,
-  },
-  strategyDetail: {
-    fontSize: 10,
-    lineHeight: 14,
-    fontFamily: fontText,
-  },
-  statBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 30,
-    gap: 8,
-  },
-  statText: {
-    fontSize: 11,
-    fontFamily: fontText,
   },
   sectionHeader: {
     flexDirection: 'row',

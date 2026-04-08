@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { transactions, categories, accounts, budgets, savingGoals } from '../db/schema';
+import { transactions, categories, accounts, budgets, savingGoals, challenges } from '../db/schema';
 import * as Crypto from 'expo-crypto';
 import { eq } from 'drizzle-orm';
 import { ensureDefaultAccount } from '../features/accounts/accountService';
@@ -224,6 +224,7 @@ export async function clearAllData(userId: string) {
     await db.delete(savingGoals).where(eq(savingGoals.userId, userId));
     await db.delete(categories).where(eq(categories.userId, userId));
     await db.delete(accounts).where(eq(accounts.userId, userId));
+    await db.delete(challenges).where(eq(challenges.userId, userId));
     
     // Restore default state
     await ensureDefaultCategories(userId);

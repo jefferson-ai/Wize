@@ -10,7 +10,7 @@ import { useAppSettingsStore } from '../store/appSettingsStore';
 import { getDashboardSummary, getTransactions, getLoggingStreak, checkLoggedToday, logNoSpendDay } from '../features/transactions/transactionService';
 import { getBudgetConsumption } from '../features/budgets/budgetService';
 import { getAccounts, getTotalBalance, ensureDefaultAccount, Account } from '../features/accounts/accountService';
-import { getSavingGoals, getSavingsStrategies } from '../features/savings/savingsService';
+import { getSavingGoals } from '../features/savings/savingsService';
 import { getCategoryEmoji } from '../utils/categoryEmojis';
 import { seedDefaultCategories } from '../features/categories/categoryService';
 import { formatAmount } from '../utils/formatters';
@@ -25,20 +25,21 @@ import { useTabHeaderInset } from '../navigation/tabHeaderInset';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 import AIInsightCard from '../components/AIInsightCard';
 import { getSmartInsights, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
+import { generateNotifications, countUnread } from '../features/notifications/notificationService';
 
 const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { user } = useAuthStore();
-  const { currency, lastNotificationViewedAt, dismissedNotificationIds } = useAppSettingsStore();
+  const { currency, isOnboarded, lastNotificationViewedAt, dismissedNotificationIds } = useAppSettingsStore();
 
   const [summary, setSummary] = useState({ balance: 0, income: 0, expense: 0, categoryData: [] as any[] });
   const [totalBalance, setTotalBalance] = useState(0);
   const [recentTx, setRecentTx] = useState<any[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
+  const [notifCount, setNotifCount] = useState(0);
   const [allBudgets, setAllBudgets] = useState<any[]>([]);
   const [savingGoals, setSavingGoals] = useState<any[]>([]);
-  const [strategies, setStrategies] = useState({ spareChange: 0, multiplier: 0, transactionCount: 0 });
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [streak, setStreak] = useState(0);
   const [hasLoggedToday, setHasLoggedToday] = useState(true);
@@ -91,7 +92,7 @@ export default function HomeScreen({ navigation }: any) {
     if (!user?.id) return;
     await ensureDefaultAccount(user.id, currency);
 
-    const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, strategiesRes, smartInsights] = await Promise.all([
+    const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, smartInsights] = await Promise.all([
       getDashboardSummary(user.id, selectedAccountId || undefined),
       getTotalBalance(user.id),
       getAccounts(user.id),
@@ -100,7 +101,6 @@ export default function HomeScreen({ navigation }: any) {
       getLoggingStreak(user.id),
       checkLoggedToday(user.id),
       getSavingGoals(user.id),
-      getSavingsStrategies(user.id),
       getSmartInsights(user.id)
     ]);
     setSummary(dashSummary as any);
@@ -116,7 +116,6 @@ export default function HomeScreen({ navigation }: any) {
     }
     setHasLoggedToday(loggedToday);
     setSavingGoals(goals);
-    setStrategies(strategiesRes);
     setInsights(smartInsights);
     
     const criticalBudgets = consumption
@@ -125,6 +124,14 @@ export default function HomeScreen({ navigation }: any) {
        .slice(0, 2);
        
     setBudgetAlerts(criticalBudgets);
+
+    // Compute unread notification count — read latest store values
+    // directly to avoid stale closure from useFocusEffect
+    try {
+      const allNotifs = await generateNotifications(user.id, currency, isOnboarded);
+      const store = useAppSettingsStore.getState();
+      setNotifCount(countUnread(allNotifs, store.dismissedNotificationIds, store.lastNotificationViewedAt));
+    } catch (_) {}
   };
 
   const showFilterOptions = () => {
@@ -197,23 +204,9 @@ export default function HomeScreen({ navigation }: any) {
             <ShakingBell 
               size={20} 
               color={colors.text} 
-              shouldShake={!!(
-                (budgetAlerts.filter(b => !dismissedNotificationIds.includes(`budget-${b.id}`)).length > 0 || 
-                 insights.anomalies.filter(a => !dismissedNotificationIds.includes(a.id)).length > 0 ||
-                 (insights.recommendedChallenge && !dismissedNotificationIds.includes(insights.recommendedChallenge.id))) && 
-                (!lastNotificationViewedAt || (
-                  insights.anomalies.some(a => new Date(a.createdAt).getTime() > new Date(lastNotificationViewedAt).getTime()) ||
-                  budgetAlerts.some(b => b.updatedAt && new Date(b.updatedAt).getTime() > new Date(lastNotificationViewedAt).getTime())
-                ))
-              )} 
+              shouldShake={notifCount > 0} 
             />
-            {!!((budgetAlerts.filter(b => !dismissedNotificationIds.includes(`budget-${b.id}`)).length > 0 || 
-               insights.anomalies.filter(a => !dismissedNotificationIds.includes(a.id)).length > 0 ||
-               (insights.recommendedChallenge && !dismissedNotificationIds.includes(insights.recommendedChallenge.id))) && 
-              (!lastNotificationViewedAt || (
-                insights.anomalies.some(a => new Date(a.createdAt).getTime() > new Date(lastNotificationViewedAt).getTime()) ||
-                budgetAlerts.some(b => b.updatedAt && new Date(b.updatedAt).getTime() > new Date(lastNotificationViewedAt).getTime())
-              ))) && <View style={styles.notifBadge} />}
+            {notifCount > 0 && <View style={styles.notifBadge} />}
           </TouchableOpacity>
         }
       />
@@ -468,7 +461,7 @@ export default function HomeScreen({ navigation }: any) {
                         <View style={[styles.miniProgressFill, { width: `${pct * 100}%`, backgroundColor: colors.primary }]} />
                       </View>
                       <Text style={[styles.challengeProgressText, { color: colors.textMuted }]}>
-                        {currency} {formatAmount(challenge.currentAmount)} of {formatAmount(challenge.targetAmount)}
+                        {currency} {formatAmount(challenge.currentAmount)} of {formatAmount(challenge.targetAmount)} • Day {challenge.currentDay} of {challenge.totalDays}
                       </Text>
                     </TouchableOpacity>
                     {idx < insights.activeChallenges.length - 1 && <View style={[styles.rowDivider, { backgroundColor: colors.border }]} />}

@@ -9,7 +9,7 @@ import { exportTransactionsToCSV } from '../features/export/exportService';
 import { seed1YearStudentData, clearAllData } from '../utils/seedData';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { db } from '../db';
-import { transactions, budgets, categories, savingGoals } from '../db/schema';
+import { transactions, budgets, categories, savingGoals, challenges } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { Trash2, Loader2 } from 'lucide-react-native';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
@@ -79,7 +79,7 @@ export default function SettingsScreen({ navigation }: any) {
   const handleClearData = () => {
     Alert.alert(
       'Reset All Data',
-      'This will permanently delete all your transactions, budgets, and savings goals. Your default account will be reset to zero. This action cannot be undone.',
+      'This will permanently delete all your transactions, budgets, spending challenges, and savings goals. Your default account will be reset to zero. This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -141,6 +141,7 @@ export default function SettingsScreen({ navigation }: any) {
         await db.delete(budgets).where(eq(budgets.userId, user.id));
         await db.delete(categories).where(eq(categories.userId, user.id));
         await db.delete(savingGoals).where(eq(savingGoals.userId, user.id));
+        await db.delete(challenges).where(eq(challenges.userId, user.id));
         
         // 3. Clear session and redirect
         await supabase.auth.signOut();

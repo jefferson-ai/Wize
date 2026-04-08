@@ -13,6 +13,8 @@ interface AIInsightCardProps {
   onDismiss: () => void;
   progress?: number; // 0 to 1
   amountLabel?: string;
+  currentDay?: number;
+  totalDays?: number;
 }
 
 export default function AIInsightCard({ 
@@ -23,7 +25,9 @@ export default function AIInsightCard({
   onAccept, 
   onDismiss,
   progress,
-  amountLabel
+  amountLabel,
+  currentDay,
+  totalDays,
 }: AIInsightCardProps) {
   const colors = useThemeColors();
   const isAnomaly = type === 'anomaly';
@@ -52,7 +56,12 @@ export default function AIInsightCard({
       {progress !== undefined && (
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
-            <Text style={[styles.progressLabel, { color: colors.text }]}>{amountLabel}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.progressLabel, { color: colors.text }]}>{amountLabel}</Text>
+              {currentDay !== undefined && totalDays !== undefined && (
+                <Text style={[styles.dayLabel, { color: colors.textMuted }]}>Day {currentDay} of {totalDays}</Text>
+              )}
+            </View>
             <Text style={[styles.progressPercent, { color: color }]}>{Math.round(progress * 100)}%</Text>
           </View>
           <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
@@ -150,5 +159,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     fontFamily: fontRounded,
+  },
+  dayLabel: {
+    fontSize: 11,
+    fontFamily: fontText,
+    marginTop: 2,
   },
 });

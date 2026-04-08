@@ -19,7 +19,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 
 export default function AccountSetupScreen({ navigation }: OnboardingStackScreenProps<'AccountSetup'>) {
   const { user } = useAuthStore();
-  const { currency } = useAppSettingsStore();
+  const { currency, setOnboarded } = useAppSettingsStore();
   const colors = useThemeColors();
 
   const [name, setName] = useState('');
@@ -43,7 +43,7 @@ export default function AccountSetupScreen({ navigation }: OnboardingStackScreen
         color: selectedColor,
         icon: type === 'bank' ? 'Landmark' : type === 'credit' ? 'CreditCard' : 'Wallet',
       });
-      navigation.navigate('FinancialGoalsSetup');
+      setOnboarded(true);
     } catch {
       Alert.alert('Error', 'Failed to save account. Please try again.');
     } finally {
