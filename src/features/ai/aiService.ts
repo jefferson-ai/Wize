@@ -160,6 +160,7 @@ async function getRecommendedChallenge(userId: string): Promise<SavingsChallenge
     });
 
     const sorted = Object.keys(totals).sort((a, b) => totals[b].val - totals[a].val);
+    if (sorted.length === 0) return null;
     const topCatId = sorted[0];
     const topCat = totals[topCatId];
 

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { supabase } from '../utils/supabase';
-import { User, Moon, LogOut, Download, FileText, DollarSign, X, ChevronRight, Database, Wallet, RefreshCw } from 'lucide-react-native';
+import { User, Moon, LogOut, Download, FileText, DollarSign, X, ChevronRight, Database, Wallet, RefreshCw, Crown } from 'lucide-react-native';
 import { exportTransactionsToCSV } from '../features/export/exportService';
 import { seed1YearStudentData, clearAllData } from '../utils/seedData';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -15,6 +15,7 @@ import { Trash2, Loader2 } from 'lucide-react-native';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
+import UpgradeModal from '../components/UpgradeModal';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -33,8 +34,9 @@ const CURRENCIES = [
 
 export default function SettingsScreen({ navigation }: any) {
   const { user, setUser } = useAuthStore();
-  const { theme, setTheme, currency, setCurrency } = useAppSettingsStore();
+  const { theme, setTheme, currency, setCurrency, isPro, setIsPro } = useAppSettingsStore();
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -59,6 +61,10 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const handleExport = async () => {
+    if (!isPro) {
+      setShowUpgrade(true);
+      return;
+    }
     if (!user?.id) return;
     try {
       await exportTransactionsToCSV(user.id);
@@ -171,6 +177,29 @@ export default function SettingsScreen({ navigation }: any) {
       >
         <View style={{ height: headerInset }} collapsable={false} />
         <View style={{ backgroundColor: colors.background }}>
+
+        {/* Pro Status */}
+        <TouchableOpacity
+          onPress={() => !isPro && setShowUpgrade(true)}
+          style={[styles.proCard, { 
+            backgroundColor: isPro ? (colors.isDark ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb') : colors.card,
+            borderColor: isPro ? '#f59e0b40' : colors.border,
+          }]}
+        >
+          <View style={[styles.proBadge, { backgroundColor: isPro ? '#f59e0b' : colors.textMuted + '30' }]}>
+            <Crown size={18} color={isPro ? '#ffffff' : colors.textMuted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.proTitle, { color: colors.text }]}>
+              {isPro ? 'SpendWise Pro' : 'SpendWise Free'}
+            </Text>
+            <Text style={[styles.proDesc, { color: colors.textMuted }]}>
+              {isPro ? 'You have access to all premium features' : 'Upgrade to unlock AI, unlimited goals & more'}
+            </Text>
+          </View>
+          {!isPro && <ChevronRight size={18} color={colors.textMuted} />}
+        </TouchableOpacity>
+
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
           <View style={[styles.avatar, { backgroundColor: colors.background }]}>
@@ -280,6 +309,21 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
             {!clearing && <ChevronRight size={16} color={colors.textMuted} />}
           </TouchableOpacity>
+
+          {/* Dev Toggle for Pro */}
+          <TouchableOpacity 
+            onPress={() => setIsPro(!isPro)} 
+            style={[styles.settingsRow, { opacity: 0.6 }]}
+          >
+            <View style={styles.settingsLeft}>
+              <View style={[styles.settingsIcon, { backgroundColor: '#f59e0b20' }]}>
+                <Crown size={17} color="#f59e0b" />
+              </View>
+              <Text style={[styles.settingsLabel, { color: colors.textMuted }]}>
+                {isPro ? '[DEV] Disable Pro' : '[DEV] Enable Pro'}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Sign Out */}
@@ -354,6 +398,13 @@ export default function SettingsScreen({ navigation }: any) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        featureTitle="CSV Data Export"
+        featureDescription="Export your full transaction history as a CSV file to analyze in spreadsheets."
+      />
     </View>
   );
 }
@@ -393,4 +444,9 @@ const styles = StyleSheet.create({
   currencyCode: { fontSize: 15, fontWeight: '600', color: '#687280', fontFamily: fontText },
   currencyName: { fontSize: 12, color: '#9aa2ad', marginTop: 1, fontFamily: fontText },
   checkBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#212529', alignItems: 'center', justifyContent: 'center' },
+
+  proCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, borderRadius: 20, padding: 16, marginBottom: 24, borderWidth: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  proBadge: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  proTitle: { fontSize: 16, fontWeight: '700', fontFamily: fontDisplay, marginBottom: 2 },
+  proDesc: { fontSize: 12, fontFamily: fontText },
 });

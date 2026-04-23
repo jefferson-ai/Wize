@@ -1,15 +1,15 @@
 import React from 'react';
-import { View, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Animated, {
   useSharedValue,
-  useAnimatedScrollHandler,
-  scrollTo,
-  runOnUI,
-  useAnimatedRef,
+  useAnimatedStyle,
   withTiming,
   Easing,
+  runOnJS,
+  useDerivedValue,
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   NavigationPositionContext,
   HeaderMorphContext,
@@ -19,8 +19,6 @@ import {
 } from '../components/AnimatedHeader';
 import { TabNavigationContext } from './navigationContext';
 import { useThemeColors } from '../hooks/useThemeColors';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 import HomeScreen from '../screens/Home';
 import AddTransactionScreen from '../screens/AddTransaction';
@@ -38,53 +36,159 @@ import AddAccountScreen from '../screens/AddAccount';
 
 import CustomTabBar from '../components/CustomTabBar';
 
-/** Header/tab morph duration for non-adjacent tab jumps (pager still jumps instantly). */
-const LONG_JUMP_MORPH_MS = 340;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-function TabNavigator({ navigation, scrollRef, onTabPress, position, index }: any) {
+/** Duration of the shrink/grow transition in ms */
+const TRANSITION_MS = 300;
+/** Scale factor for shrunk screens */
+const SCALE_MIN = 0.93;
+/** Swipe distance threshold */
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.2;
+/** Number of tab screens */
+const TAB_COUNT = 4;
+
+/**
+ * Each screen layer is always mounted. Its animated style is driven by shared values:
+ * - If it's the active screen (activeIdx matches): opacity 1, scale 1
+ * - If it's the outgoing screen during transition: fades/shrinks out
+ * - Otherwise: hidden (opacity 0)
+ */
+function ScreenLayer({
+  screenIdx,
+  activeIdx,
+  prevIdx,
+  progress,
+  transitioning,
+  navigation,
+  Screen,
+}: {
+  screenIdx: number;
+  activeIdx: Animated.SharedValue<number>;
+  prevIdx: Animated.SharedValue<number>;
+  progress: Animated.SharedValue<number>;
+  transitioning: Animated.SharedValue<boolean>;
+  navigation: any;
+  Screen: React.ComponentType<any>;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const isActive = activeIdx.value === screenIdx;
+    const isPrev = prevIdx.value === screenIdx;
+
+    if (transitioning.value) {
+      if (isActive) {
+        // Incoming: grow from SCALE_MIN → 1, fade in
+        const t = progress.value;
+        return {
+          opacity: t,
+          transform: [{ scale: SCALE_MIN + (1 - SCALE_MIN) * t }],
+          zIndex: 2,
+        };
+      }
+      if (isPrev) {
+        // Outgoing: shrink from 1 → SCALE_MIN, fade out
+        const t = progress.value;
+        return {
+          opacity: 1 - t,
+          transform: [{ scale: 1 - (1 - SCALE_MIN) * t }],
+          zIndex: 1,
+        };
+      }
+      // Not involved in this transition
+      return { opacity: 0, transform: [{ scale: SCALE_MIN }], zIndex: 0 };
+    }
+
+    // Settled state
+    if (isActive) {
+      return { opacity: 1, transform: [{ scale: 1 }], zIndex: 2 };
+    }
+    return { opacity: 0, transform: [{ scale: SCALE_MIN }], zIndex: 0 };
+  });
+
+  // Pointer events: only the active screen should be interactive
+  const isActive = useDerivedValue(() => activeIdx.value === screenIdx);
+  const pointerStyle = useAnimatedStyle(() => ({
+    pointerEvents: isActive.value ? 'auto' as const : 'none' as const,
+  }));
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
+      <Animated.View style={[{ flex: 1 }, pointerStyle]}>
+        <Screen navigation={navigation} />
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+const SCREENS = [
+  { Screen: HomeScreen, key: 'home' },
+  { Screen: TransactionHistoryScreen, key: 'transactions' },
+  { Screen: InsightsScreen, key: 'insights' },
+  { Screen: SettingsScreen, key: 'settings' },
+];
+
+function TabNavigator({
+  navigation,
+  onTabPress,
+  onSwipe,
+  position,
+  index,
+  activeIdx,
+  prevIdx,
+  transitionProgress,
+  isTransitioning,
+}: any) {
   const colors = useThemeColors();
 
   const state = {
     index: index === 0 ? 0 : (index === 1 ? 1 : index + 1),
     routes: [
-      { key: 'home', name: 'Home' },           // 0
-      { key: 'transactions', name: 'Transactions' }, // 1
-      { key: 'add', name: 'AddTransaction' }, // 2 (center)
-      { key: 'planning', name: 'Planning' },   // 3
-      { key: 'account', name: 'Account' },     // 4
+      { key: 'home', name: 'Home' },
+      { key: 'transactions', name: 'Transactions' },
+      { key: 'add', name: 'AddTransaction' },
+      { key: 'planning', name: 'Planning' },
+      { key: 'account', name: 'Account' },
     ],
   };
+
+  // Horizontal swipe gesture
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-15, 15])
+    .onEnd((event) => {
+      'worklet';
+      if (isTransitioning.value) return;
+      const { translationX, velocityX } = event;
+      if (translationX < -SWIPE_THRESHOLD || velocityX < -800) {
+        runOnJS(onSwipe)(1);
+      } else if (translationX > SWIPE_THRESHOLD || velocityX > 800) {
+        runOnJS(onSwipe)(-1);
+      }
+    });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <StationaryMorphingHeader />
-      <Animated.ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={onTabPress.scrollHandler}
-        scrollEventThrottle={16}
-        bounces={false}
-        style={{ flex: 1 }}
-      >
-        <View style={{ width: SCREEN_WIDTH, minHeight: SCREEN_HEIGHT, backgroundColor: 'transparent' }}>
-          <HomeScreen navigation={navigation} />
+
+      <GestureDetector gesture={swipeGesture}>
+        <View style={{ flex: 1 }}>
+          {SCREENS.map((item, idx) => (
+            <ScreenLayer
+              key={item.key}
+              screenIdx={idx}
+              activeIdx={activeIdx}
+              prevIdx={prevIdx}
+              progress={transitionProgress}
+              transitioning={isTransitioning}
+              navigation={navigation}
+              Screen={item.Screen}
+            />
+          ))}
         </View>
-        <View style={{ width: SCREEN_WIDTH, minHeight: SCREEN_HEIGHT, backgroundColor: 'transparent' }}>
-          <TransactionHistoryScreen navigation={navigation} />
-        </View>
-        <View style={{ width: SCREEN_WIDTH, minHeight: SCREEN_HEIGHT, backgroundColor: 'transparent' }}>
-          <InsightsScreen navigation={navigation} />
-        </View>
-        <View style={{ width: SCREEN_WIDTH, minHeight: SCREEN_HEIGHT, backgroundColor: 'transparent' }}>
-          <SettingsScreen navigation={navigation} />
-        </View>
-      </Animated.ScrollView>
-      
-      <CustomTabBar 
-        state={state} 
-        navigation={navigation} 
+      </GestureDetector>
+
+      <CustomTabBar
+        state={state}
+        navigation={navigation}
         position={position}
         onTabPress={onTabPress}
       />
@@ -97,11 +201,15 @@ const AppStack = createNativeStackNavigator();
 export default function MainNavigator() {
   const colors = useThemeColors();
   const position = useSharedValue(0);
-  const ignoreScrollForHeaderPosition = useSharedValue(0);
   const morphActive = useSharedValue(0);
   const morphFrom = useSharedValue(0);
   const morphTo = useSharedValue(0);
   const morphProgress = useSharedValue(0);
+  const transitionProgress = useSharedValue(0);
+  const isTransitioning = useSharedValue(false);
+  const activeIdx = useSharedValue(0);
+  const prevIdx = useSharedValue(0);
+
   const headerMorphRef = React.useRef<HeaderMorphState | null>(null);
   if (!headerMorphRef.current) {
     headerMorphRef.current = {
@@ -111,73 +219,79 @@ export default function MainNavigator() {
       progress: morphProgress,
     };
   }
-  const scrollRef = useAnimatedRef<Animated.ScrollView>();
-  const [index, setIndex] = React.useState(0);
 
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      if (ignoreScrollForHeaderPosition.value) {
-        return;
-      }
-      position.value = event.contentOffset.x / SCREEN_WIDTH;
-    },
-  });
+  // React state only for the tab bar indicator (doesn't affect screen rendering)
+  const [tabIndex, setTabIndex] = React.useState(0);
 
-  const scrollPagerTo = (offsetX: number, animated: boolean) => {
-    runOnUI((x: number, anim: boolean) => {
-      'worklet';
-      scrollTo(scrollRef, x, 0, anim);
-    })(offsetX, animated);
-  };
+  /** Core transition — runs entirely on the UI thread via shared values */
+  const transitionTo = React.useCallback((targetIdx: number) => {
+    if (targetIdx < 0 || targetIdx >= TAB_COUNT) return;
+    if (targetIdx === activeIdx.value) return;
 
-  const onTabPress = (i: number) => {
-    let scrollIndex = i;
-    if (i === 2) return;
-    if (i > 2) scrollIndex = i - 1;
+    // Set up the transition
+    prevIdx.value = activeIdx.value;
+    activeIdx.value = targetIdx;
 
-    const prevScrollIndex = index;
-    const isAdjacent = Math.abs(scrollIndex - prevScrollIndex) <= 1;
-    setIndex(scrollIndex);
+    // Header morph
+    morphFrom.value = prevIdx.value;
+    morphTo.value = targetIdx;
+    morphProgress.value = 0;
+    morphActive.value = 1;
 
-    const targetX = scrollIndex * SCREEN_WIDTH;
+    // Start the animation
+    isTransitioning.value = true;
+    transitionProgress.value = 0;
 
-    if (isAdjacent) {
-      morphActive.value = 0;
-      ignoreScrollForHeaderPosition.value = 0;
-      scrollPagerTo(targetX, true);
-    } else {
-      ignoreScrollForHeaderPosition.value = 1;
-      scrollPagerTo(targetX, false);
-      position.value = scrollIndex;
-      morphFrom.value = prevScrollIndex;
-      morphTo.value = scrollIndex;
-      morphProgress.value = 0;
-      morphActive.value = 1;
-      morphProgress.value = withTiming(
-        1,
-        {
-          duration: LONG_JUMP_MORPH_MS,
-          easing: Easing.out(Easing.cubic),
-        },
-        (finished) => {
-          if (finished) {
-            morphActive.value = 0;
-            ignoreScrollForHeaderPosition.value = 0;
-          }
+    // Animate header position
+    position.value = withTiming(targetIdx, {
+      duration: TRANSITION_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+
+    // Animate header morph
+    morphProgress.value = withTiming(1, {
+      duration: TRANSITION_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+
+    // Animate screen transition
+    transitionProgress.value = withTiming(
+      1,
+      {
+        duration: TRANSITION_MS,
+        easing: Easing.out(Easing.cubic),
+      },
+      (finished) => {
+        if (finished) {
+          isTransitioning.value = false;
+          morphActive.value = 0;
         }
-      );
-    }
-  };
-  // @ts-ignore - attaching for usage in TabNavigator
-  onTabPress.scrollHandler = scrollHandler;
+      }
+    );
 
-  const jumpToTab = (name: string) => {
+    // Update tab bar indicator (React state, non-blocking)
+    setTabIndex(targetIdx);
+  }, []);
+
+  const onTabPress = React.useCallback((i: number) => {
+    let scrollIndex = i;
+    if (i === 2) return; // center "add" button
+    if (i > 2) scrollIndex = i - 1;
+    transitionTo(scrollIndex);
+  }, [transitionTo]);
+
+  const onSwipe = React.useCallback((direction: number) => {
+    const target = activeIdx.value + direction;
+    transitionTo(target);
+  }, [transitionTo]);
+
+  const jumpToTab = React.useCallback((name: string) => {
     const tabNames: Record<string, number> = { 'Home': 0, 'Transactions': 1, 'Planning': 3, 'Account': 4 };
     const targetIdx = tabNames[name];
     if (targetIdx !== undefined) {
       onTabPress(targetIdx);
     }
-  };
+  }, [onTabPress]);
 
   return (
     <NavigationPositionContext.Provider value={position}>
@@ -194,10 +308,14 @@ export default function MainNavigator() {
               {(props) => (
                 <TabNavigator
                   {...props}
-                  scrollRef={scrollRef}
                   onTabPress={onTabPress}
+                  onSwipe={onSwipe}
                   position={position}
-                  index={index}
+                  index={tabIndex}
+                  activeIdx={activeIdx}
+                  prevIdx={prevIdx}
+                  transitionProgress={transitionProgress}
+                  isTransitioning={isTransitioning}
                 />
               )}
             </AppStack.Screen>
@@ -265,3 +383,4 @@ export default function MainNavigator() {
     </NavigationPositionContext.Provider>
   );
 }
+

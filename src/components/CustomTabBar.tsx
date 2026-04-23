@@ -1,32 +1,24 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Home, Wallet, Plus, LayoutGrid, User } from 'lucide-react-native';
+import { Home, CreditCard, Plus, BarChart2, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { useAnimatedStyle, withSpring, withTiming, interpolate, Extrapolate } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withSpring, interpolate, Extrapolate } from 'react-native-reanimated';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontRounded } from '../theme/fonts';
 
 const TAB_ICONS: Record<string, any> = {
   Home: Home,
-  Transactions: Wallet,
+  Transactions: CreditCard,
   AddTransaction: Plus,
-  Planning: LayoutGrid,
-  Account: User,
-};
-
-const TAB_LABELS: Record<string, string> = {
-  Home: 'Home',
-  Transactions: 'Transactions',
-  AddTransaction: '',
-  Planning: 'Planning',
-  Account: 'Account',
+  Planning: BarChart2,
+  Account: Settings,
 };
 
 function AnimatedTabButton({ route, isFocused, onPress, onLayout, label, IconComponent, activeColor, inactiveColor }: any) {
   const animatedIconStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { scale: withSpring(isFocused ? 1.1 : 1, { damping: 14, stiffness: 200 }) }
+        { scale: withSpring(isFocused ? 1.0 : 1, { damping: 14, stiffness: 200 }) }
       ],
     };
   }, [isFocused]);
@@ -45,21 +37,12 @@ function AnimatedTabButton({ route, isFocused, onPress, onLayout, label, IconCom
         <Animated.View style={animatedIconStyle}>
           {IconComponent && (
             <IconComponent
-              size={21}
+              size={24}
               color={isFocused ? activeColor : inactiveColor}
-              strokeWidth={isFocused ? 2.2 : 1.8}
+              strokeWidth={isFocused ? 3 : 2}
             />
           )}
         </Animated.View>
-        <Text
-          style={[
-            styles.label,
-            { color: isFocused ? activeColor : inactiveColor },
-            isFocused && styles.labelActive,
-          ]}
-        >
-          {label}
-        </Text>
       </View>
     </TouchableOpacity>
   );
@@ -106,10 +89,14 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       Extrapolate.CLAMP
     );
 
+    const tabHeight = tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.height ?? 0;
+    const paddingVal = 8; // Margin top/bottom for the pill
+
     return {
       opacity: 1,
       width,
-      height: tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.height ?? 0,
+      height: Math.max(0, tabHeight - paddingVal * 2), // Make it slightly smaller than full height
+      marginTop: paddingVal,
       transform: [
         { translateX },
         { translateY: tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.y ?? 0 }
@@ -121,7 +108,7 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
     const routeIndex = state.routes.indexOf(route);
     const isFocused = state.index === routeIndex;
     const IconComponent = TAB_ICONS[route.name];
-    const label = TAB_LABELS[route.name];
+    const label = route.name;
 
     const onPress = () => {
       if (route.name === 'AddTransaction') {
@@ -160,8 +147,8 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
         onLayout={handleLayout}
         label={label}
         IconComponent={IconComponent}
-        activeColor={colors.text}
-        inactiveColor={colors.textMuted}
+        activeColor={colors.primary}
+        inactiveColor={colors.text}
       />
     );
   };
@@ -189,14 +176,14 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       </View>
 
       {/* Tab bar */}
-      <View style={[styles.bar, { backgroundColor: colors.tabBarBg, shadowColor: colors.tabBarBg }]}>
+      <View style={[styles.bar, { backgroundColor: colors.tabBarBg, borderColor: colors.tabBarBorder, borderWidth: 1, shadowColor: '#000' }]}>
         {/* Sliding active indicator */}
         <Animated.View
           style={[
             {
               position: 'absolute',
               backgroundColor: colors.iconBg,
-              borderRadius: 16,
+              borderRadius: 100, // Large pill
               left: 0,
               top: 0,
             },
@@ -241,19 +228,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 16,
+    paddingVertical: 14,
+    borderRadius: 24,
     marginHorizontal: 2,
-  },
-  label: {
-    fontSize: 10,
-    marginTop: 3,
-    fontWeight: '500',
-    fontFamily: fontRounded,
-  },
-  labelActive: {
-    fontWeight: '700',
-    fontFamily: fontRounded,
   },
   centerSpacer: {
     width: 72,

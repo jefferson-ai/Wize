@@ -5,10 +5,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Plus, Wallet, CreditCard, Landmark, ChevronLeft, MoreHorizontal } from 'lucide-react-native';
 import { getAccounts, getTotalBalance, Account } from '../features/accounts/accountService';
 import { useAuthStore } from '../store/authStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { formatAmount } from '../utils/formatters';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { fontDisplay, fontText } from '../theme/fonts';
+import UpgradeModal from '../components/UpgradeModal';
 
 const getIcon = (type: string, color: string) => {
   switch (type) {
@@ -20,10 +22,20 @@ const getIcon = (type: string, color: string) => {
 
 export default function AccountsListScreen({ navigation }: any) {
   const { user } = useAuthStore();
+  const { isPro } = useAppSettingsStore();
   const colors = useThemeColors();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  const handleAddAccount = () => {
+    if (!isPro && accounts.length >= 1) {
+      setShowUpgrade(true);
+    } else {
+      navigation.navigate('AddAccount');
+    }
+  };
 
   const loadData = async () => {
     if (!user?.id) return;
@@ -53,7 +65,7 @@ export default function AccountsListScreen({ navigation }: any) {
         title="Accounts" 
         index={99} // Special index outside tab pager range
         rightElement={
-          <TouchableOpacity onPress={() => navigation.navigate('AddAccount')} style={styles.addBtn}>
+          <TouchableOpacity onPress={handleAddAccount} style={styles.addBtn}>
             <Plus size={20} color={colors.text} />
           </TouchableOpacity>
         }
@@ -113,12 +125,19 @@ export default function AccountsListScreen({ navigation }: any) {
 
         <TouchableOpacity 
           style={[styles.bigAddBtn, { backgroundColor: colors.text }]}
-          onPress={() => navigation.navigate('AddAccount')}
+          onPress={handleAddAccount}
         >
           <Plus size={22} color={colors.background} />
           <Text style={[styles.bigAddText, { color: colors.background }]}>Add New Account</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        featureTitle="Unlimited Wallets"
+        featureDescription="Free plan includes 1 wallet. Upgrade to Pro for unlimited bank accounts, credit cards, and cash wallets."
+      />
     </SafeAreaView>
   );
 }

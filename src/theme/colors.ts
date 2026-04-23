@@ -15,7 +15,7 @@ export const LightTheme = {
   iconBg: '#f0f5ff',
   iconDefault: '#212529',
   tabBarBg: '#ffffff',
-  tabBarBorder: '#f5f6f7',
+  tabBarBorder: '#e0e2e5',
   handle: '#e8eaec',
   overlay: 'rgba(0,0,0,0.45)',
   // Accent icon backgrounds (light tints)
@@ -43,8 +43,8 @@ export const DarkTheme = {
   warningBg: 'rgba(202, 138, 4, 0.1)',
   iconBg: 'rgba(255, 255, 255, 0.05)',
   iconDefault: '#ffffff',
-  tabBarBg: '#0f1214',
-  tabBarBorder: '#212529',
+  tabBarBg: '#161b1f',
+  tabBarBorder: '#2a2f33',
   handle: '#2a2f33',
   overlay: 'rgba(0,0,0,0.6)',
   // Accent icon backgrounds (dark-safe alpha tints)

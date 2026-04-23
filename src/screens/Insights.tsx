@@ -20,13 +20,14 @@ import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 import AIInsightCard from '../components/AIInsightCard';
+import UpgradeModal from '../components/UpgradeModal';
 import { getSmartInsights, acceptChallenge, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
 
 const { width } = Dimensions.get('window');
 
 export default function InsightsScreen({ navigation, route }: any) {
   const { user } = useAuthStore();
-  const { currency } = useAppSettingsStore();
+  const { currency, isPro } = useAppSettingsStore();
   const headerInset = useTabHeaderInset();
 
   const [activeTab, setActiveTab] = useState<'budgets' | 'savings'>(route?.params?.initialTab || 'budgets');
@@ -38,6 +39,8 @@ export default function InsightsScreen({ navigation, route }: any) {
   const [aiModalVisible, setAiModalVisible] = useState(false);
   const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null });
   const colors = useThemeColors();
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeContext, setUpgradeContext] = useState({ title: '', desc: '' });
 
   const confettiRef = React.useRef<ConfettiRef>(null);
   const isInitialSyncDone = React.useRef(false);
@@ -96,9 +99,19 @@ export default function InsightsScreen({ navigation, route }: any) {
 
   const handleAddAction = () => {
     if (activeTab === 'budgets') {
-      navigation.navigate('AddBudget');
+      if (!isPro && budgets.length >= 2) {
+        setUpgradeContext({ title: 'Unlimited Budgets', desc: 'Free plan includes 2 budgets. Upgrade to Pro for unlimited per-category budget tracking.' });
+        setShowUpgrade(true);
+      } else {
+        navigation.navigate('AddBudget');
+      }
     } else {
-      navigation.navigate('AddSavingGoal');
+      if (!isPro && savingGoals.length >= 1) {
+        setUpgradeContext({ title: 'Unlimited Savings Goals', desc: 'Free plan includes 1 savings goal. Upgrade to Pro for unlimited bucket goals.' });
+        setShowUpgrade(true);
+      } else {
+        navigation.navigate('AddSavingGoal');
+      }
     }
   };
 
@@ -244,7 +257,14 @@ export default function InsightsScreen({ navigation, route }: any) {
       <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => setAiModalVisible(true)}
+          onPress={() => {
+            if (!isPro) {
+              setUpgradeContext({ title: 'AI Financial Strategist', desc: 'Get personalised spending reports, anomaly alerts, and actionable financial coaching powered by AI.' });
+              setShowUpgrade(true);
+            } else {
+              setAiModalVisible(true);
+            }
+          }}
           style={[styles.aiCard, { backgroundColor: colors.text, shadowColor: colors.text }]}
         >
           <View style={styles.aiCardContent}>
@@ -317,7 +337,14 @@ export default function InsightsScreen({ navigation, route }: any) {
                   Create a budget or accept an AI challenge to monitor your financial progress.
                 </Text>
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('AddBudget')}
+                  onPress={() => {
+                    if (!isPro && budgets.length >= 2) {
+                      setUpgradeContext({ title: 'Unlimited Budgets', desc: 'Free plan includes 2 budgets. Upgrade to Pro for unlimited per-category budget tracking.' });
+                      setShowUpgrade(true);
+                    } else {
+                      navigation.navigate('AddBudget');
+                    }
+                  }}
                   style={[styles.emptyBtn, { backgroundColor: colors.text }]}
                 >
                   <Text style={[styles.emptyBtnText, { color: colors.background }]}>Create First Budget</Text>
@@ -361,6 +388,12 @@ export default function InsightsScreen({ navigation, route }: any) {
         isVisible={aiModalVisible} 
         onClose={() => setAiModalVisible(false)} 
         userId={user?.id || ''} 
+      />
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        featureTitle={upgradeContext.title}
+        featureDescription={upgradeContext.desc}
       />
     </View>
   );

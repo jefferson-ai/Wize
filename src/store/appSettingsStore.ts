@@ -8,6 +8,7 @@ interface AppSettingsState {
   currency: string;
   theme: 'light' | 'dark' | 'system';
   isOffline: boolean;
+  isPro: boolean;
   lastNotificationViewedAt: string | null;
   dismissedNotificationIds: string[];
   setOnboarded: (val: boolean) => void;
@@ -15,6 +16,7 @@ interface AppSettingsState {
   setCurrency: (val: string) => void;
   setTheme: (val: 'light' | 'dark' | 'system') => void;
   setIsOffline: (status: boolean) => void;
+  setIsPro: (val: boolean) => void;
   setLastNotificationViewedAt: (val: string) => void;
   dismissNotification: (id: string) => void;
 }
@@ -27,6 +29,7 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       currency: '$',
       theme: 'system',
       isOffline: false,
+      isPro: false,
       lastNotificationViewedAt: null,
       dismissedNotificationIds: [],
       setOnboarded: (val) => set({ isOnboarded: val }),
@@ -34,6 +37,7 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       setCurrency: (val) => set({ currency: val }),
       setTheme: (val) => set({ theme: val }),
       setIsOffline: (status) => set({ isOffline: status }),
+      setIsPro: (val) => set({ isPro: val }),
       setLastNotificationViewedAt: (val) => set({ lastNotificationViewedAt: val }),
       dismissNotification: (id) => set((state) => ({ 
         dismissedNotificationIds: [...state.dismissedNotificationIds, id] 

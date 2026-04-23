@@ -3,8 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dim
 import { X, Plus, Target, Sparkles, TrendingUp, Info } from 'lucide-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useAuthStore } from '../store/authStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { getSavingGoals } from '../features/savings/savingsService';
 import SavingBucket from '../components/SavingBucket';
+import UpgradeModal from '../components/UpgradeModal';
 import { useFocusEffect } from '@react-navigation/native';
 import { formatAmount } from '../utils/formatters';
 import { fontText } from '../theme/fonts';
@@ -14,9 +16,19 @@ const { width } = Dimensions.get('window');
 export default function SavingsGoalsScreen({ navigation }: any) {
   const colors = useThemeColors();
   const { user } = useAuthStore();
+  const { isPro } = useAppSettingsStore();
   
   const [goals, setGoals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  const handleAddGoal = () => {
+    if (!isPro && goals.length >= 1) {
+      setShowUpgrade(true);
+    } else {
+      navigation.navigate('AddSavingGoal');
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -48,7 +60,7 @@ export default function SavingsGoalsScreen({ navigation }: any) {
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>Savings & Goals</Text>
         <TouchableOpacity 
-          onPress={() => Alert.alert('Coming Soon', 'Create Goal feature is arriving shortly!')}
+          onPress={handleAddGoal}
           style={[styles.addBtn, { backgroundColor: colors.text }]}
         >
           <Plus size={20} color={colors.background} />
@@ -116,6 +128,12 @@ export default function SavingsGoalsScreen({ navigation }: any) {
         </View>
 
       </ScrollView>
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        featureTitle="Unlimited Savings Goals"
+        featureDescription="Free plan includes 1 savings goal. Upgrade to Pro for unlimited bucket goals."
+      />
     </SafeAreaView>
   );
 }

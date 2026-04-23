@@ -204,7 +204,7 @@ function HeaderLayer({
                 style={[
                   styles.streakBadge,
                   data.streak === 0
-                    ? { opacity: 0.5, backgroundColor: colors.border }
+                    ? { backgroundColor: colors.border }
                     : {
                         backgroundColor: getStreakColor(data.streak, colors.border) + '15',
                         borderColor: getStreakColor(data.streak, colors.border),

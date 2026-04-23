@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Filter, Plus } from 'lucide-react-native';
 import { useAuthStore } from '../store/authStore';
@@ -30,8 +30,13 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [selectedMonth]);
   const [filterType, setFilterType] = useState<'income' | 'expense' | null>(null);
   const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null);
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null);
@@ -106,16 +111,72 @@ export default function TransactionHistoryScreen({ navigation }: any) {
     return Array.from(monthSet.values()).sort((a, b) => b.key.localeCompare(a.key));
   }, [transactions]);
 
+  const availableDays = useMemo(() => {
+    if (!selectedMonth) return [];
+    const daySet = new Map<string, { key: string; label: string; dateObj: Date }>();
+    
+    transactions.forEach((tx) => {
+      const d = new Date(tx.date);
+      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (mKey === selectedMonth) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (!daySet.has(key)) {
+          daySet.set(key, {
+            key,
+            label: String(d.getDate()),
+            dateObj: d,
+          });
+        }
+      }
+    });
+    return Array.from(daySet.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [transactions, selectedMonth]);
+
   const filteredTransactions = useMemo(() => {
     if (!selectedMonth) return transactions;
     return transactions
       .filter((tx) => {
         const d = new Date(tx.date);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        return key === selectedMonth;
+        if (key !== selectedMonth) return false;
+        
+        if (selectedDay) {
+          const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          if (dKey !== selectedDay) return false;
+        }
+
+        return true;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedMonth]);
+  }, [transactions, selectedMonth, selectedDay]);
+
+  const groupedTransactions = useMemo(() => {
+    const groups: { title: string, data: any[] }[] = [];
+    let currentGroup: { title: string, data: any[] } | null = null;
+    
+    filteredTransactions.forEach(tx => {
+      const d = new Date(tx.date);
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+      const isYesterday = d.getDate() === yesterday.getDate() && d.getMonth() === yesterday.getMonth() && d.getFullYear() === yesterday.getFullYear();
+      
+      let title = '';
+      if (isToday) title = 'Today';
+      else if (isYesterday) title = 'Yesterday';
+      else title = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
+      if (!currentGroup || currentGroup.title !== title) {
+        if (currentGroup) groups.push(currentGroup);
+        currentGroup = { title, data: [] };
+      }
+      currentGroup.data.push(tx);
+    });
+    if (currentGroup) groups.push(currentGroup);
+    return groups;
+  }, [filteredTransactions]);
 
   const monthTotals = useMemo(() => {
     const income = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -208,7 +269,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           {item.type === 'income' ? '+' : '-'}{currency} {formatAmount(item.amount)}
         </Text>
         <Text style={[styles.txDate, { color: colors.textMuted }]}>
-          {new Date(item.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })}
+          {new Date(item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
         </Text>
       </View>
     </TouchableOpacity>
@@ -261,21 +322,60 @@ export default function TransactionHistoryScreen({ navigation }: any) {
         </View>
       )}
 
+      {/* Day Navigation */}
+      {availableDays.length > 0 && (
+        <View style={[styles.dayBar, { backgroundColor: colors.background }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+            <TouchableOpacity
+              onPress={() => setSelectedDay(null)}
+              style={[styles.dayPill, selectedDay === null ? { backgroundColor: colors.text } : { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }]}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.dayPillDayName, selectedDay === null ? { color: colors.background } : { color: colors.text }]}>
+                All
+              </Text>
+              <Text style={[styles.dayPillText, selectedDay === null ? { color: colors.background } : { color: colors.textMuted }]}>
+                Days
+              </Text>
+            </TouchableOpacity>
+            {availableDays.map((day) => {
+              const isActive = selectedDay === day.key;
+              const dayName = day.dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+              return (
+                <TouchableOpacity
+                  key={day.key}
+                  onPress={() => setSelectedDay(day.key)}
+                  style={[styles.dayPill, isActive ? { backgroundColor: colors.text } : { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.dayPillDayName, isActive ? { color: colors.background } : { color: colors.text }]}>
+                    {dayName}
+                  </Text>
+                  <Text style={[styles.dayPillText, isActive ? { color: colors.background } : { color: colors.textMuted }]}>
+                    {day.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Month Summary */}
       {selectedMonthData && !loading && filteredTransactions.length > 0 && (
         <View style={[styles.summaryRow, { backgroundColor: colors.card }]}>
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Income</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{selectedDay ? 'Day Income' : 'Income'}</Text>
             <Text style={[styles.summaryValue, { color: colors.success }]}>+{currency} {formatAmount(monthTotals.income)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.background }]} />
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Expense</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{selectedDay ? 'Day Expense' : 'Expense'}</Text>
             <Text style={[styles.summaryValue, { color: colors.danger }]}>-{currency} {formatAmount(monthTotals.expense)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.background }]} />
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Net</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{selectedDay ? 'Day Net' : 'Net'}</Text>
             <Text style={[styles.summaryValue, { color: monthTotals.income - monthTotals.expense >= 0 ? colors.success : colors.danger }]}>
               {currency} {formatAmount(monthTotals.income - monthTotals.expense)}
             </Text>
@@ -343,10 +443,16 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           <ActivityIndicator size="large" color={colors.text} />
         </View>
       ) : (
-        <FlatList
-          data={filteredTransactions}
+        <SectionList
+          sections={groupedTransactions}
           keyExtractor={item => item.id}
           renderItem={renderTransaction}
+          renderSectionHeader={({ section: { title } }) => (
+            <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+              <Text style={[styles.sectionHeaderText, { color: colors.text }]}>{title}</Text>
+            </View>
+          )}
+          stickySectionHeadersEnabled={false}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 110 }}
           ListHeaderComponent={showRadar ? (
             <View style={[styles.radarCard, { backgroundColor: colors.card }]}>
@@ -457,6 +563,14 @@ const styles = StyleSheet.create({
   monthBar: { backgroundColor: '#f5f6f7', paddingBottom: 10 },
   monthPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginRight: 8 },
   monthPillText: { fontSize: 13, fontWeight: '600', fontFamily: fontRounded },
+
+  dayBar: { paddingBottom: 10 },
+  dayPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, marginRight: 8, alignItems: 'center', minWidth: 54 },
+  dayPillDayName: { fontSize: 11, fontFamily: fontText, marginBottom: 2 },
+  dayPillText: { fontSize: 15, fontWeight: '700', fontFamily: fontRounded },
+
+  sectionHeader: { paddingVertical: 8, paddingHorizontal: 4, marginTop: 12, marginBottom: 4 },
+  sectionHeaderText: { fontSize: 13, fontWeight: '700', fontFamily: fontText, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   summaryRow: { flexDirection: 'row', justifyContent: 'space-around', marginHorizontal: 20, marginBottom: 8, backgroundColor: '#ffffff', borderRadius: 20, paddingVertical: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
   summaryLabel: { fontSize: 11, color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontFamily: fontText },

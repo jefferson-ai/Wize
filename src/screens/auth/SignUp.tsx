@@ -8,6 +8,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { signInWithGoogle, configureGoogleSignIn } from '../../utils/googleAuth';
 import GoogleIcon from '../../components/GoogleIcon';
 import { useEffect } from 'react';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { fontDisplay, fontText } from '../../theme/fonts';
 
 export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignUp'>) {
@@ -28,6 +29,10 @@ export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignU
       return;
     }
     setLoading(true);
+    
+    // Force onboarding reset so new accounts see the intro flow
+    useAppSettingsStore.getState().setOnboarded(false);
+    
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -46,6 +51,10 @@ export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignU
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
+    
+    // Force onboarding reset so new accounts see the intro flow
+    useAppSettingsStore.getState().setOnboarded(false);
+    
     const { error } = await signInWithGoogle();
     setGoogleLoading(false);
     if (error) {

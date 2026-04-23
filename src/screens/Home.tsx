@@ -26,12 +26,13 @@ import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 import AIInsightCard from '../components/AIInsightCard';
 import { getSmartInsights, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
 import { generateNotifications, countUnread } from '../features/notifications/notificationService';
+import UpgradeModal from '../components/UpgradeModal';
 
 const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { user } = useAuthStore();
-  const { currency, isOnboarded, lastNotificationViewedAt, dismissedNotificationIds } = useAppSettingsStore();
+  const { currency, isOnboarded, isPro, lastNotificationViewedAt, dismissedNotificationIds } = useAppSettingsStore();
 
   const [summary, setSummary] = useState({ balance: 0, income: 0, expense: 0, categoryData: [] as any[] });
   const [totalBalance, setTotalBalance] = useState(0);
@@ -45,6 +46,7 @@ export default function HomeScreen({ navigation }: any) {
   const [hasLoggedToday, setHasLoggedToday] = useState(true);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null });
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -128,7 +130,7 @@ export default function HomeScreen({ navigation }: any) {
     // Compute unread notification count — read latest store values
     // directly to avoid stale closure from useFocusEffect
     try {
-      const allNotifs = await generateNotifications(user.id, currency, isOnboarded);
+      const allNotifs = await generateNotifications(user.id, currency, isOnboarded, isPro);
       const store = useAppSettingsStore.getState();
       setNotifCount(countUnread(allNotifs, store.dismissedNotificationIds, store.lastNotificationViewedAt));
     } catch (_) {}
@@ -437,7 +439,7 @@ export default function HomeScreen({ navigation }: any) {
         )}
 
         {/* Challenge Progress Bar */}
-        {insights.activeChallenges.length > 0 && (
+        {isPro && insights.activeChallenges.length > 0 && (
           <View style={styles.sectionSmall}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Ongoing Challenges</Text>
@@ -472,6 +474,22 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         )}
 
+        {/* AI Teaser for Free Users */}
+        {!isPro && (
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={() => setShowUpgrade(true)}
+            style={[styles.aiTeaser, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={[styles.aiTeaserIcon, { backgroundColor: '#8b5cf620' }]}>
+              <Sparkles size={20} color="#8b5cf6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.aiTeaserTitle, { color: colors.text }]}>AI Insights & Challenges</Text>
+              <Text style={[styles.aiTeaserDesc, { color: colors.textMuted }]}>Unlock smart anomaly detection and personalized savings challenges</Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
 
         {/* Recent Transactions */}
@@ -525,6 +543,12 @@ export default function HomeScreen({ navigation }: any) {
         streak={streak} 
         isVisible={streakModalVisible} 
         onClose={() => setStreakModalVisible(false)} 
+      />
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        featureTitle="AI Financial Intelligence"
+        featureDescription="Get smart spending alerts, personalized savings challenges, and AI-powered financial coaching."
       />
     </View>
   );
@@ -636,4 +660,10 @@ const styles = StyleSheet.create({
   challengeName: { fontSize: 13, fontWeight: '700', fontFamily: fontDisplay },
   challengePct: { fontSize: 12, fontWeight: '800', fontFamily: fontRounded },
   challengeProgressText: { fontSize: 11, color: '#9aa2ad', marginTop: 8, fontFamily: fontText },
+
+  // AI Teaser
+  aiTeaser: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 22, padding: 16, borderRadius: 20, borderWidth: 1, gap: 14 },
+  aiTeaserIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  aiTeaserTitle: { fontSize: 15, fontWeight: '700', fontFamily: fontDisplay, marginBottom: 2 },
+  aiTeaserDesc: { fontSize: 12, lineHeight: 17, fontFamily: fontText },
 });

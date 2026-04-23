@@ -62,7 +62,8 @@ export function isToday(isoString: string): boolean {
 export async function generateNotifications(
   userId: string,
   currency: string,
-  isOnboarded: boolean
+  isOnboarded: boolean,
+  isPro: boolean = false
 ): Promise<AppNotification[]> {
   const notifications: AppNotification[] = [];
   const now = new Date().toISOString();
@@ -72,8 +73,8 @@ export async function generateNotifications(
     await Promise.all([
       getBudgetConsumption(userId),
       getLoggingStreak(userId),
-      getSmartInsights(userId),
-      getRecentChallengeOutcomes(userId),
+      isPro ? getSmartInsights(userId) : Promise.resolve({ anomalies: [], activeChallenges: [], recommendedChallenge: null }),
+      isPro ? getRecentChallengeOutcomes(userId) : Promise.resolve([]),
     ]);
 
   // ── 1. Budget Alerts ────────────────────────────────────────

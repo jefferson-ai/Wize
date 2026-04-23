@@ -31,7 +31,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 export default function NotificationsScreen({ navigation }: any) {
   const colors = useThemeColors();
   const { user } = useAuthStore();
-  const { currency, isOnboarded, setLastNotificationViewedAt, dismissedNotificationIds, dismissNotification } = useAppSettingsStore();
+  const { currency, isPro, isOnboarded, setLastNotificationViewedAt, dismissedNotificationIds, dismissNotification } = useAppSettingsStore();
   const tabNav = React.useContext(TabNavigationContext);
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -50,7 +50,7 @@ export default function NotificationsScreen({ navigation }: any) {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const result = await generateNotifications(user.id, currency, isOnboarded);
+      const result = await generateNotifications(user.id, currency, isOnboarded, isPro);
       setNotifications(result);
     } catch (err) {
       console.error('Failed to load notifications', err);
