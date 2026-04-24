@@ -20,7 +20,7 @@ export interface AppNotification {
   title: string;
   body: string;
   timestamp: string; // ISO string
-  iconName: string;  // lucide-react-native icon key
+  iconName: string;  // phosphor-react-native icon key
   iconColor: string;
   onPressTarget?: string; // Tab name to jump to
 }

@@ -140,11 +140,10 @@ function TabNavigator({
   const colors = useThemeColors();
 
   const state = {
-    index: index === 0 ? 0 : (index === 1 ? 1 : index + 1),
+    index: index,
     routes: [
       { key: 'home', name: 'Home' },
       { key: 'transactions', name: 'Transactions' },
-      { key: 'add', name: 'AddTransaction' },
       { key: 'planning', name: 'Planning' },
       { key: 'account', name: 'Account' },
     ],
@@ -274,10 +273,7 @@ export default function MainNavigator() {
   }, []);
 
   const onTabPress = React.useCallback((i: number) => {
-    let scrollIndex = i;
-    if (i === 2) return; // center "add" button
-    if (i > 2) scrollIndex = i - 1;
-    transitionTo(scrollIndex);
+    transitionTo(i);
   }, [transitionTo]);
 
   const onSwipe = React.useCallback((direction: number) => {
@@ -286,12 +282,12 @@ export default function MainNavigator() {
   }, [transitionTo]);
 
   const jumpToTab = React.useCallback((name: string) => {
-    const tabNames: Record<string, number> = { 'Home': 0, 'Transactions': 1, 'Planning': 3, 'Account': 4 };
+    const tabNames: Record<string, number> = { 'Home': 0, 'Transactions': 1, 'Planning': 2, 'Account': 3 };
     const targetIdx = tabNames[name];
     if (targetIdx !== undefined) {
-      onTabPress(targetIdx);
+      transitionTo(targetIdx);
     }
-  }, [onTabPress]);
+  }, [transitionTo]);
 
   return (
     <NavigationPositionContext.Provider value={position}>

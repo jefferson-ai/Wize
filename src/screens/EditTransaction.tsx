@@ -12,13 +12,13 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Tag, FileText, CalendarDays, ChevronLeft, ChevronRight, Trash2, Wallet } from 'lucide-react-native';
+import { X, Tag, FileText, CalendarBlank, CaretLeft, CaretRight, Trash, Wallet } from 'phosphor-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { updateTransaction, deleteTransaction } from '../features/transactions/transactionService';
 import { getCategories } from '../features/categories/categoryService';
 import { getAccounts } from '../features/accounts/accountService';
-import { getCategoryEmoji } from '../utils/categoryEmojis';
+import CategoryIcon from '../components/CategoryIcon';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontText } from '../theme/fonts';
 
@@ -163,7 +163,7 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                   accessibilityRole="button"
                   accessibilityLabel="Delete transaction"
                 >
-                  <Trash2 size={18} color={colors.danger} />
+                  <Trash size={18} color={colors.danger} />
                 </TouchableOpacity>
               </View>
 
@@ -220,9 +220,14 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                     <Tag size={16} color={colors.text} />
                   </View>
                   <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Category  </Text>
-                  <Text style={[styles.fieldValue, { color: colors.text }]} numberOfLines={1}>
-                    {selectedCat ? `${getCategoryEmoji(selectedCat.name)} ${selectedCat.name}` : 'Select'}
-                  </Text>
+                  {selectedCat ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <CategoryIcon categoryName={selectedCat.name} size={14} color={colors.text} />
+                      <Text style={[styles.fieldValue, { color: colors.text }]} numberOfLines={1}>{selectedCat.name}</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.fieldValue, { color: colors.text }]}>Select</Text>
+                  )}
                   <Text style={styles.chevronText}>{showCategories ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
@@ -236,10 +241,11 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                           <TouchableOpacity
                             key={cat.id}
                             onPress={() => { setSelectedCategory(cat.id); setShowCategories(false); }}
-                            style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
+                            style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 6 }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
                           >
+                            <CategoryIcon categoryName={cat.name} size={13} color={isSelected ? colors.background : colors.text} weight="bold" />
                             <Text style={[styles.catChipText, isSelected && { color: colors.background }]}>
-                              {getCategoryEmoji(cat.name)} {cat.name}
+                              {cat.name}
                             </Text>
                           </TouchableOpacity>
                         );
@@ -302,7 +308,7 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                 {/* Date */}
                 <View style={styles.fieldRow}>
                   <View style={[styles.fieldIcon, { backgroundColor: colors.accentCalendarBg }]}>
-                    <CalendarDays size={16} color="#3b82f6" />
+                    <CalendarBlank size={16} color="#3b82f6" />
                   </View>
                   <TouchableOpacity 
                     style={{ flex: 1, paddingVertical: 10 }}
@@ -312,10 +318,10 @@ export default function EditTransactionScreen({ navigation, route }: any) {
                   </TouchableOpacity>
                   <View style={styles.dateControls}>
                     <TouchableOpacity onPress={() => shiftDate(-1)} style={[styles.dateBtn, { backgroundColor: colors.background }]}>
-                      <ChevronLeft size={16} color={colors.textMuted} />
+                      <CaretLeft size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => shiftDate(1)} style={[styles.dateBtn, { backgroundColor: colors.background }]}>
-                      <ChevronRight size={16} color={colors.textMuted} />
+                      <CaretRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -337,7 +343,7 @@ export default function EditTransactionScreen({ navigation, route }: any) {
             {/* Action Buttons */}
             <View style={styles.actionArea}>
               <TouchableOpacity onPress={handleDelete} style={[styles.deleteBtnBottom, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBg }]} activeOpacity={0.85}>
-                <Trash2 size={18} color={colors.danger} />
+                <Trash size={18} color={colors.danger} />
                 <Text style={[styles.deleteBtnText, { color: colors.danger }]}>Delete</Text>
               </TouchableOpacity>
               <TouchableOpacity

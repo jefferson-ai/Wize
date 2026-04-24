@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Styl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthStackScreenProps } from '../../navigation/types';
 import { supabase } from '../../utils/supabase';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
+import { Eye, EyeSlash, ArrowLeft } from 'phosphor-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { signInWithGoogle, configureGoogleSignIn } from '../../utils/googleAuth';
 import GoogleIcon from '../../components/GoogleIcon';
@@ -105,7 +105,7 @@ export default function SignUpScreen({ navigation }: AuthStackScreenProps<'SignU
                 onPress={() => setShowPassword(!showPassword)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                {showPassword ? <EyeOff size={20} color={colors.textMuted} /> : <Eye size={20} color={colors.textMuted} />}
+                {showPassword ? <EyeSlash size={20} color={colors.textMuted} /> : <Eye size={20} color={colors.textMuted} />}
               </TouchableOpacity>
             </View>
           </View>

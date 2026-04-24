@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated } from 'react-native';
-import { X, Sparkles, CheckCircle2, TrendingUp, Heart, AlertTriangle } from 'lucide-react-native';
+import { X, Sparkle, CheckCircle, TrendUp, Heart, Warning } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getAIAdvice, AIAdvice } from '../services/aiAdvisor';
 import { getSmartInsights, AnomalyAlert } from '../features/ai/aiService';
@@ -68,7 +68,7 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
           <View style={styles.modalHeader}>
             <View style={styles.headerTitle}>
               <View style={[styles.iconWrap, { backgroundColor: colors.text + '10' }]}>
-                <Sparkles size={20} color={colors.text} />
+                <Sparkle size={20} color={colors.text} weight="fill" />
               </View>
               <Text style={[styles.modalTitle, { color: colors.text }]}>AI Financial Strategist</Text>
             </View>
@@ -90,7 +90,7 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
                 {/* Summary Section */}
                 <View style={[styles.section, styles.summarySection, { backgroundColor: colors.card, borderColor: colors.border }]}>
                    <View style={styles.sectionHeader}>
-                     <TrendingUp size={18} color={colors.text} style={{ marginRight: 8 }} />
+                     <TrendUp size={18} color={colors.text} style={{ marginRight: 8 }} />
                      <Text style={[styles.sectionTitle, { color: colors.text }]}>Intelligence Report</Text>
                    </View>
                    <Text style={[styles.summaryText, { color: colors.text }]}>{advice?.summary}</Text>
@@ -103,7 +103,7 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
                     {anomalies.map(a => (
                       <View key={a.id} style={[styles.anomalyAlert, { backgroundColor: colors.danger + '10', borderColor: colors.danger + '20' }]}>
                         <View style={styles.anomalyIcon}>
-                          <AlertTriangle size={18} color={colors.danger} />
+                          <Warning size={18} color={colors.danger} weight="fill" />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.anomalyTitle, { color: colors.text }]}>Spending Spike: {a.categoryName}</Text>
@@ -120,7 +120,7 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
                 <Text style={[styles.label, { color: colors.textMuted }]}>Actionable Steps</Text>
                 {advice?.actionItems.map((item, index) => (
                   <View key={index} style={[styles.actionItem, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <CheckCircle2 size={18} color={colors.text} style={{ marginRight: 12, marginTop: 2 }} />
+                    <CheckCircle size={18} color={colors.text} style={{ marginRight: 12, marginTop: 2 }} />
                     <Text style={[styles.actionText, { color: colors.text }]}>{item}</Text>
                   </View>
                 ))}

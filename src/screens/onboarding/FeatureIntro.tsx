@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Animated, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowRight, ArrowLeft } from 'lucide-react-native';
+import { ArrowRight, ArrowLeft } from 'phosphor-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { OnboardingStackScreenProps } from '../../navigation/types';
 import { fontDisplay, fontRounded, fontText } from '../../theme/fonts';
@@ -168,7 +168,7 @@ export default function FeatureIntroScreen({ navigation }: OnboardingStackScreen
           <Text style={[styles.nextButtonText, { color: colors.background }]}>
             {currentIndex === FEATURES.length - 1 ? "Let's Begin" : "Next"}
           </Text>
-          <ArrowRight size={20} color={colors.background} strokeWidth={2.5} />
+          <ArrowRight size={20} color={colors.background} weight="bold" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 interface NumpadProps {
   onPress: (value: string) => void;
@@ -22,7 +23,10 @@ export default function Numpad({ onPress, onDelete, onSubmit, submitLabel = 'Don
         {keys.flat().map((keyPad) => (
           <TouchableOpacity
             key={keyPad}
-            onPress={() => (keyPad === 'DEL' ? onDelete() : onPress(keyPad))}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              keyPad === 'DEL' ? onDelete() : onPress(keyPad);
+            }}
             className="w-[30%] aspect-square items-center justify-center mb-4 rounded-full bg-zinc-50 dark:bg-zinc-900 active:bg-zinc-200 dark:active:bg-zinc-800"
           >
             {keyPad === 'DEL' ? (
@@ -37,7 +41,10 @@ export default function Numpad({ onPress, onDelete, onSubmit, submitLabel = 'Don
       </View>
       {onSubmit && (
         <TouchableOpacity
-          onPress={onSubmit}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onSubmit();
+          }}
           className="w-full bg-brand-500 py-4 mt-2 rounded-2xl items-center shadow-sm"
         >
           <Text className="text-white font-semibold text-xl">{submitLabel}</Text>

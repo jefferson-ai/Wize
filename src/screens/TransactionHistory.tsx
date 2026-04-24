@@ -1,14 +1,17 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet, Animated, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Filter, Plus } from 'lucide-react-native';
+import { ArrowLeft, Funnel, Plus, Trash } from 'phosphor-react-native';
+import { Swipeable, RectButton, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, interpolateColor } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
-import { getTransactions, getLoggingStreak } from '../features/transactions/transactionService';
+import { getTransactions, getLoggingStreak, deleteTransaction } from '../features/transactions/transactionService';
 import { getCategories } from '../features/categories/categoryService';
 import { getAccounts } from '../features/accounts/accountService';
-import { useFocusEffect } from '@react-navigation/native';
-import { getCategoryEmoji } from '../utils/categoryEmojis';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import CategoryIcon from '../components/CategoryIcon';
 import { formatAmount } from '../utils/formatters';
 import RadarChart from '../components/RadarChart';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -19,24 +22,51 @@ import Confetti, { ConfettiRef } from '../components/Confetti';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const AnimatedMonthText = ({ month, isActive, onPress, onLayout, colors }: any) => {
+  const progress = useSharedValue(isActive ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = withTiming(isActive ? 1 : 0, { duration: 250 });
+  }, [isActive]);
+
+  const textColorStyle = useAnimatedStyle(() => {
+    return {
+      color: interpolateColor(
+        progress.value,
+        [0, 1],
+        [colors.textMuted, colors.background]
+      )
+    };
+  });
+
+  return (
+    <TouchableOpacity onPress={onPress} onLayout={onLayout} activeOpacity={0.8} style={[styles.monthPill, { backgroundColor: 'transparent', zIndex: 1 }]}>
+      <Reanimated.Text style={[styles.monthPillText, textColorStyle]}>
+        {month.label}
+      </Reanimated.Text>
+    </TouchableOpacity>
+  );
+};
+
 export default function TransactionHistoryScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
   const colors = useThemeColors();
   const headerInset = useTabHeaderInset();
+  const isFocused = useIsFocused();
 
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [activeMonth, setActiveMonth] = useState<string | null>(null);
+
 
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    setSelectedDay(null);
-  }, [selectedMonth]);
+
   const [filterType, setFilterType] = useState<'income' | 'expense' | null>(null);
   const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null);
   const [filterAccountId, setFilterAccountId] = useState<string | null>(null);
@@ -49,6 +79,37 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   const prevStreak = useRef<number | null>(null);
 
   const monthScrollRef = useRef<ScrollView>(null);
+  const switchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sliding Indicator Refs
+  const pillTranslateX = useSharedValue(0);
+  const pillTranslateY = useSharedValue(0);
+  const pillWidth = useSharedValue(0);
+  const pillHeight = useSharedValue(0);
+  const layouts = useRef<Record<string, { x: number, y: number, width: number, height: number }>>({}).current;
+  const [layoutTrigger, setLayoutTrigger] = useState(0);
+
+  useEffect(() => {
+    if (activeMonth && layouts[activeMonth]) {
+      const target = layouts[activeMonth];
+      const timingConfig = { duration: 250 };
+      pillTranslateX.value = withTiming(target.x, timingConfig);
+      pillTranslateY.value = withTiming(target.y, timingConfig);
+      pillWidth.value = withTiming(target.width, timingConfig);
+      pillHeight.value = withTiming(target.height, timingConfig);
+    }
+  }, [activeMonth, layoutTrigger]);
+
+  const indicatorStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: pillTranslateX.value },
+        { translateY: pillTranslateY.value }
+      ],
+      width: pillWidth.value,
+      height: pillHeight.value,
+    };
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -88,8 +149,10 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       const latestKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       // Only force update if current month is gone or if explicitly filtering anew
       setSelectedMonth(latestKey);
+      setActiveMonth(latestKey);
     } else {
       setSelectedMonth(null);
+      setActiveMonth(null);
     }
     
     setLoading(false);
@@ -111,26 +174,6 @@ export default function TransactionHistoryScreen({ navigation }: any) {
     return Array.from(monthSet.values()).sort((a, b) => b.key.localeCompare(a.key));
   }, [transactions]);
 
-  const availableDays = useMemo(() => {
-    if (!selectedMonth) return [];
-    const daySet = new Map<string, { key: string; label: string; dateObj: Date }>();
-    
-    transactions.forEach((tx) => {
-      const d = new Date(tx.date);
-      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (mKey === selectedMonth) {
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        if (!daySet.has(key)) {
-          daySet.set(key, {
-            key,
-            label: String(d.getDate()),
-            dateObj: d,
-          });
-        }
-      }
-    });
-    return Array.from(daySet.values()).sort((a, b) => a.key.localeCompare(b.key));
-  }, [transactions, selectedMonth]);
 
   const filteredTransactions = useMemo(() => {
     if (!selectedMonth) return transactions;
@@ -139,16 +182,10 @@ export default function TransactionHistoryScreen({ navigation }: any) {
         const d = new Date(tx.date);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         if (key !== selectedMonth) return false;
-        
-        if (selectedDay) {
-          const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          if (dKey !== selectedDay) return false;
-        }
-
         return true;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, selectedMonth, selectedDay]);
+  }, [transactions, selectedMonth]);
 
   const groupedTransactions = useMemo(() => {
     const groups: { title: string, data: any[] }[] = [];
@@ -249,30 +286,72 @@ export default function TransactionHistoryScreen({ navigation }: any) {
 
   const showRadar = comparisonData !== null && filterType === null;
 
+  const handleDelete = (id: string) => {
+    Alert.alert('Delete Transaction', 'Are you sure you want to delete this transaction?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+          if (!user?.id) return;
+          try {
+            await deleteTransaction(id, user.id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            fetchData();
+          } catch (e) {
+            Alert.alert('Error', 'Failed to delete transaction');
+          }
+      }}
+    ]);
+  };
+
+  const renderRightActions = (id: string, progress: any, dragX: any) => {
+    const scale = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0.8, 1],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <GHTouchableOpacity
+        activeOpacity={0.6}
+        onPress={() => handleDelete(id)}
+        style={[styles.deleteAction, { backgroundColor: colors.dangerBg }]}
+      >
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Trash size={22} color={colors.danger} />
+        </Animated.View>
+      </GHTouchableOpacity>
+    );
+  };
+
   const renderTransaction = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={[styles.txRow, { backgroundColor: colors.card }]}
-      activeOpacity={0.7}
-      onPress={() => navigation.navigate('EditTransaction', { transaction: item })}
-      accessibilityRole="button"
-      accessibilityLabel={`Edit ${item.category?.name || 'Unknown'} transaction`}
+    <Swipeable
+      key={item.id}
+      renderRightActions={(progress, dragX) => renderRightActions(item.id, progress, dragX)}
+      friction={1.5}
+      rightThreshold={40}
     >
-      <View style={[styles.txIcon, { backgroundColor: (item.category?.color || '#94a3b8') + '22' }]}>
-        <Text style={{ fontSize: 22 }}>{getCategoryEmoji(item.category?.name)}</Text>
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.txName, { color: colors.text }]}>{item.category?.name || 'Unknown'}</Text>
-        {item.note && <Text style={[styles.txNote, { color: colors.textMuted }]} numberOfLines={1}>{item.note}</Text>}
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={[styles.txAmount, { color: item.type === 'income' ? colors.success : colors.danger }]}>
-          {item.type === 'income' ? '+' : '-'}{currency} {formatAmount(item.amount)}
-        </Text>
-        <Text style={[styles.txDate, { color: colors.textMuted }]}>
-          {new Date(item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-        </Text>
-      </View>
-    </TouchableOpacity>
+      <RectButton
+        style={[styles.txRow, { backgroundColor: colors.card }]}
+        onPress={() => navigation.navigate('EditTransaction', { transaction: item })}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${item.category?.name || 'Unknown'} transaction`}
+      >
+        <View style={[styles.txIcon, { backgroundColor: (item.category?.color || '#94a3b8') + '22' }]}>
+          <CategoryIcon categoryName={item.category?.name} size={20} color={item.category?.color || '#94a3b8'} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.txName, { color: colors.text }]}>{item.category?.name || 'Unknown'}</Text>
+          {item.note && <Text style={[styles.txNote, { color: colors.textMuted }]} numberOfLines={1}>{item.note}</Text>}
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={[styles.txAmount, { color: item.type === 'income' ? colors.success : colors.danger }]}>
+            {item.type === 'income' ? '+' : '-'}{currency} {formatAmount(item.amount)}
+          </Text>
+          <Text style={[styles.txDate, { color: colors.textMuted }]}>
+            {new Date(item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+          </Text>
+        </View>
+      </RectButton>
+    </Swipeable>
   );
 
   return (
@@ -287,7 +366,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
             accessibilityLabel="Toggle Filters"
             style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
           >
-            <Filter size={20} color={colors.background} strokeWidth={2.5} />
+            <Funnel size={20} color={colors.background} weight="bold" />
             {activeFilterCount > 0 && (
               <View style={[styles.filterBadge, { backgroundColor: colors.background, borderColor: colors.text, borderWidth: 1 }]}>
                 <Text style={[styles.filterBadgeText, { color: colors.text }]}>{activeFilterCount}</Text>
@@ -303,58 +382,48 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       {availableMonths.length > 0 && (
         <View style={[styles.monthBar, { backgroundColor: colors.background }]}>
           <ScrollView ref={monthScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-            {availableMonths.map((month) => {
-              const isActive = selectedMonth === month.key;
-              return (
-                <TouchableOpacity
-                  key={month.key}
-                  onPress={() => setSelectedMonth(month.key)}
-                  style={[styles.monthPill, isActive ? { backgroundColor: colors.text } : { backgroundColor: colors.card }]}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.monthPillText, isActive ? { color: colors.background } : { color: colors.textMuted }]}>
-                    {month.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+            {/* Gliding Indicator */}
+            <Reanimated.View
+              style={[
+                {
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  backgroundColor: colors.text,
+                  borderRadius: 20,
+                  zIndex: 0,
+                },
+                indicatorStyle
+              ]}
+            />
 
-      {/* Day Navigation */}
-      {availableDays.length > 0 && (
-        <View style={[styles.dayBar, { backgroundColor: colors.background }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-            <TouchableOpacity
-              onPress={() => setSelectedDay(null)}
-              style={[styles.dayPill, selectedDay === null ? { backgroundColor: colors.text } : { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.dayPillDayName, selectedDay === null ? { color: colors.background } : { color: colors.text }]}>
-                All
-              </Text>
-              <Text style={[styles.dayPillText, selectedDay === null ? { color: colors.background } : { color: colors.textMuted }]}>
-                Days
-              </Text>
-            </TouchableOpacity>
-            {availableDays.map((day) => {
-              const isActive = selectedDay === day.key;
-              const dayName = day.dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+            {availableMonths.map((month) => {
+              const isActive = activeMonth === month.key;
               return (
-                <TouchableOpacity
-                  key={day.key}
-                  onPress={() => setSelectedDay(day.key)}
-                  style={[styles.dayPill, isActive ? { backgroundColor: colors.text } : { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border }]}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.dayPillDayName, isActive ? { color: colors.background } : { color: colors.text }]}>
-                    {dayName}
-                  </Text>
-                  <Text style={[styles.dayPillText, isActive ? { color: colors.background } : { color: colors.textMuted }]}>
-                    {day.label}
-                  </Text>
-                </TouchableOpacity>
+                <AnimatedMonthText
+                  key={month.key}
+                  month={month}
+                  isActive={isActive}
+                  colors={colors}
+                  onLayout={(e: any) => {
+                    const { x, y, width, height } = e.nativeEvent.layout;
+                    layouts[month.key] = { x, y, width, height };
+                    if (month.key === activeMonth) {
+                      setLayoutTrigger(prev => prev + 1);
+                    }
+                  }}
+                  onPress={() => {
+                    if (activeMonth === month.key) return;
+                    setActiveMonth(month.key);
+                    
+                    if (switchTimeoutRef.current) {
+                      clearTimeout(switchTimeoutRef.current);
+                    }
+                    switchTimeoutRef.current = setTimeout(() => {
+                      setSelectedMonth(month.key);
+                    }, 250);
+                  }}
+                />
               );
             })}
           </ScrollView>
@@ -365,17 +434,17 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       {selectedMonthData && !loading && filteredTransactions.length > 0 && (
         <View style={[styles.summaryRow, { backgroundColor: colors.card }]}>
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{selectedDay ? 'Day Income' : 'Income'}</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Income</Text>
             <Text style={[styles.summaryValue, { color: colors.success }]}>+{currency} {formatAmount(monthTotals.income)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.background }]} />
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{selectedDay ? 'Day Expense' : 'Expense'}</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Expense</Text>
             <Text style={[styles.summaryValue, { color: colors.danger }]}>-{currency} {formatAmount(monthTotals.expense)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.background }]} />
           <View style={{ alignItems: 'center' }}>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{selectedDay ? 'Day Net' : 'Net'}</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Net</Text>
             <Text style={[styles.summaryValue, { color: monthTotals.income - monthTotals.expense >= 0 ? colors.success : colors.danger }]}>
               {currency} {formatAmount(monthTotals.income - monthTotals.expense)}
             </Text>
@@ -453,6 +522,10 @@ export default function TransactionHistoryScreen({ navigation }: any) {
             </View>
           )}
           stickySectionHeadersEnabled={false}
+          initialNumToRender={15}
+          maxToRenderPerBatch={15}
+          windowSize={10}
+          removeClippedSubviews={true}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 110 }}
           ListHeaderComponent={showRadar ? (
             <View style={[styles.radarCard, { backgroundColor: colors.card }]}>
@@ -507,6 +580,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                   previousColor={radarType === 'income' ? '#86efac' : '#d2b48c'}
                   gridColor={colors.border}
                   labelColor={colors.text}
+                  isFocused={isFocused}
                 />
               ) : (
                 <View style={{ height: 260, alignItems: 'center', justifyContent: 'center' }}>
@@ -564,10 +638,7 @@ const styles = StyleSheet.create({
   monthPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginRight: 8 },
   monthPillText: { fontSize: 13, fontWeight: '600', fontFamily: fontRounded },
 
-  dayBar: { paddingBottom: 10 },
-  dayPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, marginRight: 8, alignItems: 'center', minWidth: 54 },
-  dayPillDayName: { fontSize: 11, fontFamily: fontText, marginBottom: 2 },
-  dayPillText: { fontSize: 15, fontWeight: '700', fontFamily: fontRounded },
+
 
   sectionHeader: { paddingVertical: 8, paddingHorizontal: 4, marginTop: 12, marginBottom: 4 },
   sectionHeaderText: { fontSize: 13, fontWeight: '700', fontFamily: fontText, textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -614,4 +685,14 @@ const styles = StyleSheet.create({
   
   streakBadge: { backgroundColor: '#fff3cd', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#ffe69c' },
   streakText: { fontSize: 13, fontWeight: '700', color: '#856404', fontFamily: fontRounded },
+  deleteAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    maxHeight: 78,
+    borderRadius: 18,
+    marginBottom: 10,
+    marginLeft: 10,
+  },
 });

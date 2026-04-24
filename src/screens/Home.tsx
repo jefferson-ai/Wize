@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActionSheetIOS, Platform, Alert } from 'react-native';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActionSheetIOS, Platform, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { PieChart } from 'react-native-gifted-charts';
-import { Eye, EyeOff, ArrowUpRight, ChevronDown, Flame, Sparkles } from 'lucide-react-native';
+import { Eye, EyeSlash, ArrowUpRight, CaretDown, Flame, Sparkle } from 'phosphor-react-native';
 
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -11,7 +11,7 @@ import { getDashboardSummary, getTransactions, getLoggingStreak, checkLoggedToda
 import { getBudgetConsumption } from '../features/budgets/budgetService';
 import { getAccounts, getTotalBalance, ensureDefaultAccount, Account } from '../features/accounts/accountService';
 import { getSavingGoals } from '../features/savings/savingsService';
-import { getCategoryEmoji } from '../utils/categoryEmojis';
+import CategoryIcon from '../components/CategoryIcon';
 import { seedDefaultCategories } from '../features/categories/categoryService';
 import { formatAmount } from '../utils/formatters';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -35,6 +35,11 @@ export default function HomeScreen({ navigation }: any) {
   const { currency, isOnboarded, isPro, lastNotificationViewedAt, dismissedNotificationIds } = useAppSettingsStore();
 
   const [summary, setSummary] = useState({ balance: 0, income: 0, expense: 0, categoryData: [] as any[] });
+  const [chartKey, setChartKey] = useState(0);
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const translateXAnim = useRef(new Animated.Value(-50)).current;
+  const translateYAnim = useRef(new Animated.Value(50)).current;
   const [totalBalance, setTotalBalance] = useState(0);
   const [recentTx, setRecentTx] = useState<any[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
@@ -84,9 +89,27 @@ export default function HomeScreen({ navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
+      // Delay slightly to ensure tab transition finishes so the spiral build is visible
+      const timer = setTimeout(() => {
+        setChartKey(prev => prev + 1);
+        
+        scaleAnim.setValue(0.5);
+        opacityAnim.setValue(0);
+        translateXAnim.setValue(-50);
+        translateYAnim.setValue(50);
+        Animated.parallel([
+          Animated.timing(opacityAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }),
+          Animated.spring(translateXAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true }),
+          Animated.spring(translateYAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true })
+        ]).start();
+      }, 150);
+
       if (user?.id) {
         loadData();
       }
+      
+      return () => clearTimeout(timer);
     }, [user?.id, selectedAccountId])
   );
 
@@ -269,7 +292,7 @@ export default function HomeScreen({ navigation }: any) {
                   accessibilityLabel={balanceHidden ? 'Show balance' : 'Hide balance'}
                 >
                   {balanceHidden ? (
-                    <EyeOff size={15} color="rgba(255,255,255,0.55)" />
+                    <EyeSlash size={15} color="rgba(255,255,255,0.55)" />
                   ) : (
                     <Eye size={15} color="rgba(255,255,255,0.55)" />
                   )}
@@ -320,14 +343,24 @@ export default function HomeScreen({ navigation }: any) {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.chartDropdownText, { color: colors.textMuted }]}>{selectedAccountName}</Text>
-                <ChevronDown size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
+                <CaretDown size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
             </View>
 
             {hasChartData ? (
               <>
-                <View style={styles.chartWrapper}>
+                <Animated.View style={[styles.chartWrapper, { 
+                  opacity: opacityAnim, 
+                  transform: [
+                    { translateX: translateXAnim },
+                    { translateY: translateYAnim },
+                    { scale: scaleAnim }
+                  ] 
+                }]}>
                   <PieChart
+                    key={chartKey}
+                    isAnimated
+                    animationDuration={1200}
                     donut
                     innerRadius={65}
                     radius={85}
@@ -350,7 +383,7 @@ export default function HomeScreen({ navigation }: any) {
                       )
                     }}
                   />
-                </View>
+                </Animated.View>
 
                 {/* Legend */}
                 <View style={styles.legendContainer}>
@@ -411,7 +444,7 @@ export default function HomeScreen({ navigation }: any) {
                     >
                       <View style={styles.budgetRowTop}>
                         <View style={styles.budgetRowLeft}>
-                          <Text style={{ fontSize: 18, marginRight: 8 }}>{getCategoryEmoji(budget.category?.name)}</Text>
+                          <CategoryIcon categoryName={budget.category?.name} size={18} color={colors.text} style={{ marginRight: 8 }} />
                           <View>
                             <Text style={[styles.budgetName, { color: colors.text }]}>{budget.category?.name || 'Budget'}</Text>
                             {(isOver || isWarn) && (
@@ -443,7 +476,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.sectionSmall}>
             <View style={styles.sectionHeaderRow}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>Ongoing Challenges</Text>
-              <Sparkles size={16} color={colors.primary} />
+              <Sparkle size={16} color={colors.primary} weight="fill" />
             </View>
             <View style={[styles.challengeProgressCard, { backgroundColor: colors.card }]}>
               {insights.activeChallenges.map((challenge, idx) => {
@@ -482,7 +515,7 @@ export default function HomeScreen({ navigation }: any) {
             style={[styles.aiTeaser, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
             <View style={[styles.aiTeaserIcon, { backgroundColor: '#8b5cf620' }]}>
-              <Sparkles size={20} color="#8b5cf6" />
+              <Sparkle size={20} color="#8b5cf6" weight="fill" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.aiTeaserTitle, { color: colors.text }]}>AI Insights & Challenges</Text>
@@ -503,7 +536,7 @@ export default function HomeScreen({ navigation }: any) {
               style={styles.seeAllBtn}
             >
               <Text style={[styles.seeAllText, { color: colors.text }]}>See All</Text>
-              <ArrowUpRight size={14} color={colors.text} strokeWidth={2.5} />
+              <ArrowUpRight size={14} color={colors.text} weight="bold" />
             </TouchableOpacity>
           </View>
 
@@ -520,7 +553,7 @@ export default function HomeScreen({ navigation }: any) {
                 accessibilityLabel={`Edit ${tx.category?.name || 'Unknown'} transaction`}
               >
                 <View style={[styles.txIcon, { backgroundColor: (tx.category?.color || '#94a3b8') + '22' }]}>
-                  <Text style={{ fontSize: 22 }}>{getCategoryEmoji(tx.category?.name)}</Text>
+                  <CategoryIcon categoryName={tx.category?.name} size={20} color={tx.category?.color || '#94a3b8'} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.txName, { color: colors.text }]}>{tx.category?.name || 'Unknown'}</Text>

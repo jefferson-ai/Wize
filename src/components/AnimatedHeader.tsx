@@ -8,7 +8,6 @@ import Confetti, { ConfettiRef } from './Confetti';
 import { getStreakColor } from './StreakBadges';
 import { fontDisplay, fontRounded } from '../theme/fonts';
 import GlassyNavigationTitle from './GlassyNavigationTitle';
-import * as LucideIcons from 'lucide-react-native';
 
 // Context to share swipe position and header data across the app
 export const NavigationPositionContext = createContext<SharedValue<number> | null>(null);
@@ -31,7 +30,7 @@ interface HeaderData {
   confettiRef?: React.RefObject<ConfettiRef | null>;
   useGlassyTitle?: boolean;
   tint?: string;
-  iconName?: keyof typeof LucideIcons;
+  iconName?: string;
 }
 
 interface HeaderContextType {
@@ -204,10 +203,10 @@ function HeaderLayer({
                 style={[
                   styles.streakBadge,
                   data.streak === 0
-                    ? { backgroundColor: colors.border }
+                    ? { backgroundColor: colors.border, borderWidth: 0 }
                     : {
-                        backgroundColor: getStreakColor(data.streak, colors.border) + '15',
-                        borderColor: getStreakColor(data.streak, colors.border),
+                        backgroundColor: getStreakColor(data.streak, '#FFB800') + '15',
+                        borderColor: getStreakColor(data.streak, '#FFB800'),
                       },
                 ]}
               >
@@ -216,7 +215,7 @@ function HeaderLayer({
                     styles.streakText,
                     data.streak === 0
                       ? { color: colors.textMuted }
-                      : { color: getStreakColor(data.streak, colors.border) },
+                      : { color: getStreakColor(data.streak, '#FFB800') },
                   ]}
                 >
                   {data.streak} 🔥

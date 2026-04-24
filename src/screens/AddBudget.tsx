@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Calendar } from 'lucide-react-native';
+import { X, CalendarBlank } from 'phosphor-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { createBudget } from '../features/budgets/budgetService';
 import { getCategories } from '../features/categories/categoryService';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { getCategoryEmoji } from '../utils/categoryEmojis';
+import CategoryIcon from '../components/CategoryIcon';
 import { fontDisplay, fontText } from '../theme/fonts';
 
 export default function AddBudgetScreen({ navigation }: any) {
@@ -103,14 +103,14 @@ export default function AddBudgetScreen({ navigation }: any) {
               onPress={() => setPeriod('monthly')}
               style={[styles.periodBtn, period === 'monthly' && { backgroundColor: colors.card }]}
             >
-              <Calendar size={16} color={period === 'monthly' ? colors.text : colors.textMuted} style={{ marginRight: 6 }} />
+              <CalendarBlank size={16} color={period === 'monthly' ? colors.text : colors.textMuted} style={{ marginRight: 6 }} />
               <Text style={[styles.periodBtnText, period === 'monthly' ? { color: colors.text } : { color: colors.textMuted }]}>Monthly</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setPeriod('weekly')}
               style={[styles.periodBtn, period === 'weekly' && { backgroundColor: colors.card }]}
             >
-              <Calendar size={16} color={period === 'weekly' ? colors.text : colors.textMuted} style={{ marginRight: 6 }} />
+              <CalendarBlank size={16} color={period === 'weekly' ? colors.text : colors.textMuted} style={{ marginRight: 6 }} />
               <Text style={[styles.periodBtnText, period === 'weekly' ? { color: colors.text } : { color: colors.textMuted }]}>Weekly</Text>
             </TouchableOpacity>
           </View>
@@ -129,7 +129,7 @@ export default function AddBudgetScreen({ navigation }: any) {
                   { backgroundColor: cat.color },
                   selectedCategoryId === cat.id && { borderWidth: 3, borderColor: colors.text },
                 ]}>
-                  <Text style={[styles.categoryDotText, { color: '#ffffff' }]}>{getCategoryEmoji(cat.name)}</Text>
+                  <CategoryIcon categoryName={cat.name} size={16} color="#fff" />
                 </View>
                 <Text style={[styles.categoryName, { color: colors.textMuted }]} numberOfLines={1}>{cat.name}</Text>
               </TouchableOpacity>

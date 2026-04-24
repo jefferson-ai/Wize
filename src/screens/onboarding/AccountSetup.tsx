@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Platform, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Landmark, CreditCard, Wallet, Check } from 'lucide-react-native';
+import { Bank, CreditCard, Wallet, Check } from 'phosphor-react-native';
 import { OnboardingStackScreenProps } from '../../navigation/types';
 import { createAccount } from '../../features/accounts/accountService';
 import { useAuthStore } from '../../store/authStore';
@@ -10,7 +10,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { fontDisplay, fontText, fontRounded } from '../../theme/fonts';
 
 const ACCOUNT_TYPES = [
-  { id: 'bank', label: 'Bank Account', icon: Landmark },
+  { id: 'bank', label: 'Bank Account', icon: Bank },
   { id: 'credit', label: 'Credit Card', icon: CreditCard },
   { id: 'cash', label: 'Cash / Wallet', icon: Wallet },
 ];

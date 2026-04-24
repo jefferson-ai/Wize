@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View } from 'react-native';
 import Svg, { Polygon, Line, Circle, Text as SvgText, TSpan } from 'react-native-svg';
 
@@ -15,6 +15,7 @@ interface RadarChartProps {
   previousColor?: string;
   gridColor?: string;
   labelColor?: string;
+  isFocused?: boolean;
 }
 
 const formatCompact = (n: number): string => {
@@ -30,6 +31,7 @@ export default function RadarChart({
   previousColor = '#b5894e',
   gridColor = '#e5e7eb',
   labelColor = '#64748b',
+  isFocused = true,
 }: RadarChartProps) {
   if (!data || data.length < 3) return null;
 
@@ -47,9 +49,37 @@ export default function RadarChart({
 
   const angleOf = (i: number) => (Math.PI * 2 * i) / N - Math.PI / 2;
 
+  const [animProgress, setAnimProgress] = useState(isFocused ? 0 : 1);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setAnimProgress(0);
+      return;
+    }
+    
+    let start = Date.now();
+    let animationFrameId: number;
+    const duration = 600; // ms
+    
+    const animate = () => {
+      const now = Date.now();
+      const progress = Math.min((now - start) / duration, 1);
+      // Cubic ease out
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setAnimProgress(easeOut);
+      
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [isFocused, data]);
+
   const pointAt = (i: number, value: number) => {
     const angle = angleOf(i);
-    const r = (value / maxValue) * radius;
+    const r = (value / maxValue) * radius * Math.max(0.01, animProgress);
     return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
   };
 

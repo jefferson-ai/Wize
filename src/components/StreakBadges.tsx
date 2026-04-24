@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
-import { Flame } from 'lucide-react-native';
+import { Flame } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
@@ -21,8 +21,8 @@ export default function StreakBadges({ streak, isVisible, onClose }: { streak: n
   const colors = useThemeColors();
 
   const highestUnlocked = [...STREAK_MILESTONES].reverse().find(m => streak >= m.days);
-  const currentFlameColor = highestUnlocked ? highestUnlocked.color : colors.border;
-  const isCurrentFill = !!highestUnlocked;
+  const currentFlameColor = highestUnlocked ? highestUnlocked.color : (streak > 0 ? '#FFB800' : colors.border);
+  const isCurrentFill = streak > 0;
 
   return (
     <Modal transparent visible={isVisible} animationType="fade" onRequestClose={onClose}>
@@ -46,8 +46,7 @@ export default function StreakBadges({ streak, isVisible, onClose }: { streak: n
                       <Flame 
                         size={28} 
                         color={color} 
-                        fill={isAchieved ? color : 'transparent'} 
-                        strokeWidth={isAchieved ? 0 : 2} 
+                        weight={isAchieved ? 'fill' : 'regular'} 
                       />
                     </View>
                     <Text style={[styles.badgeText, { color: isAchieved ? colors.text : colors.textMuted }]}>{milestone.days}d</Text>
@@ -68,7 +67,7 @@ export default function StreakBadges({ streak, isVisible, onClose }: { streak: n
 
           <View style={[styles.currentStreakCard, { backgroundColor: colors.background }]}>
             <View style={[styles.largeFlameContainer, { backgroundColor: currentFlameColor + '15' }]}>
-              <Flame size={40} color={currentFlameColor} fill={isCurrentFill ? currentFlameColor : 'transparent'} strokeWidth={isCurrentFill ? 0 : 2} />
+              <Flame size={40} color={currentFlameColor} weight={isCurrentFill ? 'fill' : 'regular'} />
             </View>
             <View style={{ marginLeft: 16 }}>
               <Text style={[styles.currentStreakNum, { color: colors.text }]}>{streak} Days</Text>
@@ -82,7 +81,7 @@ export default function StreakBadges({ streak, isVisible, onClose }: { streak: n
                 const daysTo = m.days - streak;
                 return (
                   <View key={m.days} style={styles.insightRow}>
-                     <Flame size={20} color={isAch ? m.color : colors.border} fill={isAch ? m.color : 'transparent'} strokeWidth={isAch ? 0 : 2} />
+                     <Flame size={20} color={isAch ? m.color : colors.border} weight={isAch ? 'fill' : 'regular'} />
                      <Text style={[styles.insightRowText, { color: isAch ? colors.text : colors.textMuted }]}>{m.days} Day Badge</Text>
                      <Text style={[styles.insightRowStatus, { color: isAch ? '#4ade80' : colors.textMuted }]}>
                        {isAch ? 'Unlocked' : `${daysTo} days left`}

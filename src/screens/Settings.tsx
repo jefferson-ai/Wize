@@ -4,14 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { supabase } from '../utils/supabase';
-import { User, Moon, LogOut, Download, FileText, DollarSign, X, ChevronRight, Database, Wallet, RefreshCw, Crown } from 'lucide-react-native';
+import { User, Moon, SignOut, DownloadSimple, FileText, CurrencyDollar, X, CaretRight, Database, Wallet, ArrowsClockwise, Crown, Trash, SpinnerGap } from 'phosphor-react-native';
 import { exportTransactionsToCSV } from '../features/export/exportService';
 import { seed1YearStudentData, clearAllData } from '../utils/seedData';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { db } from '../db';
 import { transactions, budgets, categories, savingGoals, challenges } from '../db/schema';
 import { eq } from 'drizzle-orm';
-import { Trash2, Loader2 } from 'lucide-react-native';
+
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
@@ -197,7 +197,7 @@ export default function SettingsScreen({ navigation }: any) {
               {isPro ? 'You have access to all premium features' : 'Upgrade to unlock AI, unlimited goals & more'}
             </Text>
           </View>
-          {!isPro && <ChevronRight size={18} color={colors.textMuted} />}
+          {!isPro && <CaretRight size={18} color={colors.textMuted} />}
         </TouchableOpacity>
 
         {/* Profile Card */}
@@ -228,7 +228,7 @@ export default function SettingsScreen({ navigation }: any) {
             </View>
             <View style={styles.settingsRight}>
               <Text style={[styles.settingsValue, { color: colors.textMuted }]}>{themeLabel}</Text>
-              <ChevronRight size={16} color={colors.textMuted} />
+              <CaretRight size={16} color={colors.textMuted} />
             </View>
           </TouchableOpacity>
 
@@ -245,7 +245,7 @@ export default function SettingsScreen({ navigation }: any) {
               <Text style={[styles.settingsLabel, { color: colors.text }]}>Accounts</Text>
             </View>
             <View style={styles.settingsRight}>
-              <ChevronRight size={16} color={colors.textMuted} />
+              <CaretRight size={16} color={colors.textMuted} />
             </View>
           </TouchableOpacity>
 
@@ -257,13 +257,13 @@ export default function SettingsScreen({ navigation }: any) {
           >
             <View style={styles.settingsLeft}>
               <View style={[styles.settingsIcon, { backgroundColor: colors.accentBlueBg }]}>
-                <DollarSign size={17} color="#3b82f6" />
+                <CurrencyDollar size={17} color="#3b82f6" />
               </View>
               <Text style={[styles.settingsLabel, { color: colors.text }]}>Currency</Text>
             </View>
             <View style={styles.settingsRight}>
               <Text style={[styles.settingsValue, { color: colors.textMuted }]}>{currentCurrency.symbol} {currentCurrency.code}</Text>
-              <ChevronRight size={16} color={colors.textMuted} />
+              <CaretRight size={16} color={colors.textMuted} />
             </View>
           </TouchableOpacity>
         </View>
@@ -279,11 +279,11 @@ export default function SettingsScreen({ navigation }: any) {
           >
             <View style={styles.settingsLeft}>
               <View style={[styles.settingsIcon, { backgroundColor: colors.successBg }]}>
-                <Download size={17} color={colors.success} />
+                <DownloadSimple size={17} color={colors.success} />
               </View>
               <Text style={[styles.settingsLabel, { color: colors.text }]}>Export to CSV</Text>
             </View>
-            <ChevronRight size={16} color={colors.textMuted} />
+            <CaretRight size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleSeed} style={[styles.settingsRow, styles.settingsRowBorder, { borderBottomColor: colors.background }]} disabled={seeding}>
@@ -295,19 +295,19 @@ export default function SettingsScreen({ navigation }: any) {
                 {seeding ? 'Generating mock data...' : 'Seed 1-Year Legon Data'}
               </Text>
             </View>
-            {!seeding && <ChevronRight size={16} color={colors.textMuted} />}
+            {!seeding && <CaretRight size={16} color={colors.textMuted} />}
           </TouchableOpacity>
 
           <TouchableOpacity onPress={handleClearData} style={styles.settingsRow} disabled={clearing}>
             <View style={styles.settingsLeft}>
               <View style={[styles.settingsIcon, { backgroundColor: colors.danger + '15' }]}>
-                <RefreshCw size={17} color={colors.danger} />
+                <ArrowsClockwise size={17} color={colors.danger} />
               </View>
               <Text style={[styles.settingsLabel, { color: colors.danger }]}>
                 {clearing ? 'Clearing records...' : 'Reset All Data'}
               </Text>
             </View>
-            {!clearing && <ChevronRight size={16} color={colors.textMuted} />}
+            {!clearing && <CaretRight size={16} color={colors.textMuted} />}
           </TouchableOpacity>
 
           {/* Dev Toggle for Pro */}
@@ -332,7 +332,7 @@ export default function SettingsScreen({ navigation }: any) {
           <TouchableOpacity onPress={handleLogout} style={[styles.settingsRow, styles.settingsRowBorder, { borderBottomColor: colors.background }]}>
             <View style={styles.settingsLeft}>
               <View style={[styles.settingsIcon, { backgroundColor: colors.border }]}>
-                <LogOut size={17} color={colors.text} />
+                <SignOut size={17} color={colors.text} />
               </View>
               <Text style={[styles.settingsLabel, { color: colors.text }]}>Log Out</Text>
             </View>
@@ -342,9 +342,9 @@ export default function SettingsScreen({ navigation }: any) {
             <View style={styles.settingsLeft}>
               <View style={[styles.settingsIcon, { backgroundColor: colors.danger + '15' }]}>
                 {deleting ? (
-                  <Loader2 size={17} color={colors.danger} />
+                  <SpinnerGap size={17} color={colors.danger} />
                 ) : (
-                  <Trash2 size={17} color={colors.danger} />
+                  <Trash size={17} color={colors.danger} />
                 )}
               </View>
               <Text style={[styles.settingsLabel, { color: colors.danger }]}>

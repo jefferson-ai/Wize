@@ -9,7 +9,7 @@ import Animated, {
   cancelAnimation,
   Easing
 } from 'react-native-reanimated';
-import { Bell } from 'lucide-react-native';
+import { Bell } from 'phosphor-react-native';
 
 interface ShakingBellProps {
   size?: number;

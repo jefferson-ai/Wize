@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Plus, Wallet, CreditCard, Landmark, ChevronLeft, MoreHorizontal } from 'lucide-react-native';
+import { Plus, Wallet, CreditCard, Bank, CaretLeft, DotsThreeOutline } from 'phosphor-react-native';
 import { getAccounts, getTotalBalance, Account } from '../features/accounts/accountService';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -14,7 +14,7 @@ import UpgradeModal from '../components/UpgradeModal';
 
 const getIcon = (type: string, color: string) => {
   switch (type) {
-    case 'bank': return <Landmark size={22} color={color} />;
+    case 'bank': return <Bank size={22} color={color} />;
     case 'credit': return <CreditCard size={22} color={color} />;
     default: return <Wallet size={22} color={color} />;
   }
@@ -77,7 +77,7 @@ export default function AccountsListScreen({ navigation }: any) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} />}
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ChevronLeft size={24} color={colors.text} />
+          <CaretLeft size={24} color={colors.text} />
         </TouchableOpacity>
 
         {/* Aggregate Balance */}
@@ -110,7 +110,7 @@ export default function AccountsListScreen({ navigation }: any) {
                   style={{ marginTop: 4, padding: 4 }}
                   onPress={() => navigation.navigate('AddAccount', { account: acc })}
                 >
-                  <MoreHorizontal size={18} color={colors.textMuted} />
+                  <DotsThreeOutline size={18} color={colors.textMuted} weight="fill" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>

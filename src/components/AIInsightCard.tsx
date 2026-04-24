@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { AlertCircle, Target, ArrowRight, X } from 'lucide-react-native';
+import { WarningCircle, Crosshair, ArrowRight, X } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
@@ -40,9 +40,9 @@ export default function AIInsightCard({
       <View style={styles.header}>
         <View style={[styles.iconBox, { backgroundColor: isAnomaly ? colors.danger + '15' : color + '15' }]}>
           {isAnomaly ? (
-            <AlertCircle size={20} color={colors.danger} />
+            <WarningCircle size={20} color={colors.danger} weight="fill" />
           ) : (
-            <Target size={20} color={color} />
+            <Crosshair size={20} color={color} />
           )}
         </View>
         <Text style={[styles.title, { color: colors.text }]}>{title}</Text>

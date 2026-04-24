@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Target, Sparkles, TrendingUp, Info } from 'lucide-react-native';
+import { Plus, Crosshair, Sparkle, TrendUp, Info } from 'phosphor-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { getBudgetConsumption } from '../features/budgets/budgetService';
@@ -9,7 +9,7 @@ import { getCategories } from '../features/categories/categoryService';
 import { getLoggingStreak } from '../features/transactions/transactionService';
 import { getSavingGoals } from '../features/savings/savingsService';
 import { formatAmount } from '../utils/formatters';
-import { getCategoryEmoji } from '../utils/categoryEmojis';
+import CategoryIcon from '../components/CategoryIcon';
 import { useThemeColors } from '../hooks/useThemeColors';
 import StreakBadges, { getStreakColor } from '../components/StreakBadges';
 import Confetti, { ConfettiRef } from '../components/Confetti';
@@ -150,7 +150,7 @@ export default function InsightsScreen({ navigation, route }: any) {
         <View style={styles.budgetHeader}>
           <View style={styles.budgetLeft}>
             <View style={[styles.categoryDot, { backgroundColor: budget.category?.color || '#94a3b8' }]}>
-              <Text style={styles.categoryDotText}>{getCategoryEmoji(budget.category?.name)}</Text>
+              <CategoryIcon categoryName={budget.category?.name} size={16} color="#fff" />
             </View>
             <View>
               <Text style={[styles.categoryName, { color: colors.text }]}>{budget.category?.name || 'Category'}</Text>
@@ -199,7 +199,7 @@ export default function InsightsScreen({ navigation, route }: any) {
       
       {savingGoals.length === 0 ? (
         <View style={[styles.emptyGoals, { backgroundColor: colors.card }]}>
-          <Target size={32} color={colors.textMuted} />
+          <Crosshair size={32} color={colors.textMuted} />
           <Text style={[styles.emptyTitle, { color: colors.text, fontSize: 18, marginTop: 12 }]}>Fuel your dreams</Text>
           <Text style={[styles.emptyBody, { color: colors.textMuted, marginTop: 4 }]}>Create your first goal bucket to start tracking progress.</Text>
           <TouchableOpacity onPress={() => navigation.navigate('AddSavingGoal')} style={[styles.emptyBtn, { backgroundColor: colors.text, marginTop: 24 }]}>
@@ -246,7 +246,7 @@ export default function InsightsScreen({ navigation, route }: any) {
             accessibilityLabel={activeTab === 'budgets' ? "Add budget" : "Add goal"}
             style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
           >
-            <Plus size={20} color={colors.background} strokeWidth={2.5} />
+            <Plus size={20} color={colors.background} weight="bold" />
           </TouchableOpacity>
         }
       />
@@ -270,14 +270,14 @@ export default function InsightsScreen({ navigation, route }: any) {
           <View style={styles.aiCardContent}>
             <View style={styles.aiTextContainer}>
               <View style={styles.aiBadge}>
-                <Sparkles size={12} color={colors.background} style={{ marginRight: 4 }} />
+                <Sparkle size={12} color={colors.background} weight="fill" style={{ marginRight: 4 }} />
                 <Text style={[styles.aiBadgeText, { color: colors.background }]}>AI Strategy</Text>
               </View>
               <Text style={[styles.aiTitle, { color: colors.background }]}>Unlock Financial Insights</Text>
               <Text style={[styles.aiSubtitle, { color: colors.background, opacity: 0.7 }]}>Let your AI strategist analyze your habits</Text>
             </View>
             <View style={[styles.aiIconCircle, { backgroundColor: colors.background + '20' }]}>
-              <Sparkles size={24} color={colors.background} />
+              <Sparkle size={24} color={colors.background} weight="fill" />
             </View>
           </View>
         </TouchableOpacity>

@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Target, Heart, Home, Car, Gift, Briefcase, Camera, Plane, Coffee } from 'lucide-react-native';
+import { X, Crosshair, Heart, House, Car, Gift, Briefcase, Camera, AirplaneTilt, Coffee } from 'phosphor-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { createSavingGoal } from '../features/savings/savingsService';
@@ -10,11 +10,11 @@ import { formatAmount } from '../utils/formatters';
 import { fontDisplay, fontText } from '../theme/fonts';
 
 const GOAL_ICONS = [
-  { name: 'Target', Icon: Target },
-  { name: 'Home', Icon: Home },
+  { name: 'Target', Icon: Crosshair },
+  { name: 'Home', Icon: House },
   { name: 'Car', Icon: Car },
   { name: 'Gift', Icon: Gift },
-  { name: 'Travel', Icon: Plane },
+  { name: 'Travel', Icon: AirplaneTilt },
   { name: 'Tech', Icon: Camera },
   { name: 'Career', Icon: Briefcase },
   { name: 'Leisure', Icon: Coffee },

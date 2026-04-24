@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, Styl
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthStackScreenProps } from '../../navigation/types';
 import { supabase } from '../../utils/supabase';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft } from 'phosphor-react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { fontDisplay, fontText } from '../../theme/fonts';
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check } from 'lucide-react-native';
+import { Check } from 'phosphor-react-native';
 import { OnboardingStackScreenProps } from '../../navigation/types';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -75,7 +75,7 @@ export default function CurrencySetupScreen({ navigation }: OnboardingStackScree
                 </View>
                 {isSelected && (
                   <View style={[styles.checkCircle, { backgroundColor: colors.success }]}>
-                    <Check size={14} color="#ffffff" strokeWidth={3} />
+                    <Check size={14} color="#ffffff" weight="bold" />
                   </View>
                 )}
               </TouchableOpacity>

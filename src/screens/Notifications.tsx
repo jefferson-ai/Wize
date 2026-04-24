@@ -2,9 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
 import { Swipeable, TouchableOpacity as GHTouchableOpacity, RectButton, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import {
-  X, Bell, Flame, Wallet, CheckCircle2, AlertTriangle, Trash2, Sparkles,
-  AlertOctagon, Trophy, HeartCrack
-} from 'lucide-react-native';
+  X, Bell, Flame, Wallet, CheckCircle, Warning, Trash, Sparkle,
+  WarningOctagon, Trophy, HeartBreak
+} from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -18,13 +18,13 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 // Map icon name strings to actual components
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
-  AlertTriangle,
-  AlertOctagon,
+  AlertTriangle: Warning,
+  AlertOctagon: WarningOctagon,
   Flame,
   Trophy,
-  HeartCrack,
-  Sparkles,
-  CheckCircle2,
+  HeartCrack: HeartBreak,
+  Sparkles: Sparkle,
+  CheckCircle2: CheckCircle,
   Bell,
 };
 
@@ -97,7 +97,7 @@ export default function NotificationsScreen({ navigation }: any) {
         style={[styles.deleteAction, { backgroundColor: colors.dangerBg }]}
       >
         <Animated.View style={{ transform: [{ scale }] }}>
-          <Trash2 size={22} color={colors.danger} />
+          <Trash size={22} color={colors.danger} />
         </Animated.View>
       </GHTouchableOpacity>
     );

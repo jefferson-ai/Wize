@@ -1,13 +1,22 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
-import * as LucideIcons from 'lucide-react-native';
+import * as PhosphorIcons from 'phosphor-react-native';
 import { fontDisplay } from '../theme/fonts';
 import { useThemeColors } from '../hooks/useThemeColors';
 
+// Map old Lucide icon names to Phosphor equivalents
+const ICON_MAP: Record<string, keyof typeof PhosphorIcons> = {
+  Sparkles: 'Sparkle',
+  BarChart2: 'ChartBar',
+  Settings: 'GearSix',
+  CreditCard: 'CreditCard',
+  Home: 'House',
+};
+
 interface GlassyNavigationTitleProps {
   title: string;
-  iconName?: keyof typeof LucideIcons;
+  iconName?: string;
   tint?: string;
   onPress?: () => void;
   style?: ViewStyle;
@@ -23,7 +32,8 @@ export default function GlassyNavigationTitle({
   const colors = useThemeColors();
   
   // Conditionally select the icon component
-  const IconComponent = iconName ? (LucideIcons[iconName] as any) : null;
+  const mappedName = iconName ? (ICON_MAP[iconName] || iconName) : null;
+  const IconComponent = mappedName ? (PhosphorIcons[mappedName] as any) : null;
 
   const Wrapper = onPress ? TouchableOpacity : View;
 
@@ -63,7 +73,7 @@ export default function GlassyNavigationTitle({
           <IconComponent 
             size={16} 
             color={colors.text} 
-            strokeWidth={2.5} 
+            weight="bold" 
             style={styles.icon} 
           />
         )}

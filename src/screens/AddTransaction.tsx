@@ -12,13 +12,14 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Tag, FileText, CalendarDays, ChevronLeft, ChevronRight, Check, Wallet } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { X, Tag, FileText, CalendarBlank, CaretLeft, CaretRight, Check, Wallet } from 'phosphor-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { addTransaction } from '../features/transactions/transactionService';
 import { getCategories, addCustomCategory } from '../features/categories/categoryService';
 import { getAccounts, ensureDefaultAccount } from '../features/accounts/accountService';
-import { getCategoryEmoji } from '../utils/categoryEmojis';
+import CategoryIcon from '../components/CategoryIcon';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontText } from '../theme/fonts';
 
@@ -113,6 +114,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     if (!selectedCategory) { Alert.alert('Error', 'Select a category'); return; }
     if (!selectedAccountId) { Alert.alert('Error', 'Select an account'); return; }
     try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await addTransaction({
         userId: user!.id,
         type,
@@ -124,6 +126,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
         note: note || null,
         receiptUrl: null
       });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (navigation.canGoBack()) navigation.goBack();
     } catch { Alert.alert('Error', 'Failed to add transaction'); }
   };
@@ -155,13 +158,13 @@ export default function AddTransactionScreen({ navigation, route }: any) {
               {/* Type Toggle */}
               <View style={[styles.typeToggle, { backgroundColor: colors.background }]}>
                 <TouchableOpacity
-                  onPress={() => setType('expense')}
+                  onPress={() => { Haptics.selectionAsync(); setType('expense'); }}
                   style={[styles.typeBtn, type === 'expense' && { backgroundColor: colors.text }]}
                 >
                   <Text style={[styles.typeBtnText, type === 'expense' && { color: colors.background }]}>Expense</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setType('income')}
+                  onPress={() => { Haptics.selectionAsync(); setType('income'); }}
                   style={[styles.typeBtn, type === 'income' && { backgroundColor: colors.text }]}
                 >
                   <Text style={[styles.typeBtnText, type === 'income' && { color: colors.background }]}>Income</Text>
@@ -205,9 +208,14 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                     <Tag size={16} color={colors.text} />
                   </View>
                   <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Category  </Text>
-                  <Text style={[styles.fieldValue, { color: colors.text }]} numberOfLines={1}>
-                    {selectedCat ? `${getCategoryEmoji(selectedCat.name)} ${selectedCat.name}` : 'Select'}
-                  </Text>
+                  {selectedCat ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <CategoryIcon categoryName={selectedCat.name} size={14} color={colors.text} />
+                      <Text style={[styles.fieldValue, { color: colors.text }]} numberOfLines={1}>{selectedCat.name}</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.fieldValue, { color: colors.text }]}>Select</Text>
+                  )}
                   <Text style={styles.chevronText}>{showCategories ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
@@ -220,11 +228,12 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                         return (
                           <TouchableOpacity
                             key={cat.id}
-                            onPress={() => { setSelectedCategory(cat.id); setShowCategories(false); setShowCustomInput(false); }}
-                            style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
+                            onPress={() => { Haptics.selectionAsync(); setSelectedCategory(cat.id); setShowCategories(false); setShowCustomInput(false); }}
+                            style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 6 }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
                           >
+                            <CategoryIcon categoryName={cat.name} size={13} color={isSelected ? colors.background : colors.text} weight="bold" />
                             <Text style={[styles.catChipText, isSelected && { color: colors.background }]}>
-                              {getCategoryEmoji(cat.name)} {cat.name}
+                              {cat.name}
                             </Text>
                           </TouchableOpacity>
                         );
@@ -254,7 +263,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                           disabled={addingCustom}
                           style={[styles.customInputBtn, { backgroundColor: colors.text }]}
                         >
-                          <Check size={16} color={colors.background} strokeWidth={2.5} />
+                          <Check size={16} color={colors.background} weight="bold" />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -285,7 +294,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                         return (
                           <TouchableOpacity
                             key={acc.id}
-                            onPress={() => { setSelectedAccountId(acc.id); setShowAccounts(false); }}
+                            onPress={() => { Haptics.selectionAsync(); setSelectedAccountId(acc.id); setShowAccounts(false); }}
                             style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, isSelected && { backgroundColor: colors.text, borderColor: colors.text }]}
                           >
                             <Text style={[styles.catChipText, isSelected && { color: colors.background }]}>
@@ -321,7 +330,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                 {/* Date */}
                 <View style={styles.fieldRow}>
                   <View style={[styles.fieldIcon, { backgroundColor: colors.accentCalendarBg }]}>
-                    <CalendarDays size={16} color="#3b82f6" />
+                    <CalendarBlank size={16} color="#3b82f6" />
                   </View>
                   <TouchableOpacity 
                     style={{ flex: 1, paddingVertical: 10 }}
@@ -330,11 +339,11 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                     <Text style={[styles.dateText, { color: colors.text }]}>{formatDate(date)}</Text>
                   </TouchableOpacity>
                   <View style={styles.dateControls}>
-                    <TouchableOpacity onPress={() => shiftDate(-1)} style={[styles.dateBtn, { backgroundColor: colors.background }]}>
-                      <ChevronLeft size={16} color={colors.textMuted} />
+                    <TouchableOpacity onPress={() => { Haptics.selectionAsync(); shiftDate(-1); }} style={[styles.dateBtn, { backgroundColor: colors.background }]}>
+                      <CaretLeft size={16} color={colors.textMuted} />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => shiftDate(1)} style={[styles.dateBtn, { backgroundColor: colors.background }]}>
-                      <ChevronRight size={16} color={colors.textMuted} />
+                    <TouchableOpacity onPress={() => { Haptics.selectionAsync(); shiftDate(1); }} style={[styles.dateBtn, { backgroundColor: colors.background }]}>
+                      <CaretRight size={16} color={colors.textMuted} />
                     </TouchableOpacity>
                   </View>
                 </View>

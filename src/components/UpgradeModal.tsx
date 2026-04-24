@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions } from 'react-native';
-import { X, Crown, Check, Lock } from 'lucide-react-native';
+import { X, Crown, Check, Lock } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontText, fontRounded } from '../theme/fonts';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -73,7 +73,7 @@ export default function UpgradeModal({ visible, onClose, featureTitle, featureDe
             {PRO_FEATURES.map((feature, i) => (
               <View key={i} style={styles.featureRow}>
                 <View style={[styles.checkCircle, { backgroundColor: '#22c55e20' }]}>
-                  <Check size={12} color="#22c55e" strokeWidth={3} />
+                  <Check size={12} color="#22c55e" weight="bold" />
                 </View>
                 <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
               </View>

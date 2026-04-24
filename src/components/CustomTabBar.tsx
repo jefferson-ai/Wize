@@ -1,15 +1,17 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, useColorScheme } from 'react-native';
 import { Home, CreditCard, Plus, BarChart2, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, withSpring, interpolate, Extrapolate } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { fontRounded } from '../theme/fonts';
+import { fontText } from '../theme/fonts';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 
 const TAB_ICONS: Record<string, any> = {
   Home: Home,
   Transactions: CreditCard,
-  AddTransaction: Plus,
   Planning: BarChart2,
   Account: Settings,
 };
@@ -18,7 +20,7 @@ function AnimatedTabButton({ route, isFocused, onPress, onLayout, label, IconCom
   const animatedIconStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { scale: withSpring(isFocused ? 1.0 : 1, { damping: 14, stiffness: 200 }) }
+        { scale: withSpring(isFocused ? 1.05 : 1, { damping: 14, stiffness: 200 }) }
       ],
     };
   }, [isFocused]);
@@ -34,14 +36,17 @@ function AnimatedTabButton({ route, isFocused, onPress, onLayout, label, IconCom
       accessibilityLabel={label}
     >
       <View style={[styles.tab, { backgroundColor: 'transparent' }]}>
-        <Animated.View style={animatedIconStyle}>
+        <Animated.View style={[styles.iconContainer, animatedIconStyle]}>
           {IconComponent && (
             <IconComponent
-              size={24}
+              size={22}
               color={isFocused ? activeColor : inactiveColor}
-              strokeWidth={isFocused ? 3 : 2}
+              strokeWidth={isFocused ? 2.5 : 2}
             />
           )}
+          <Text style={[styles.tabLabel, { color: isFocused ? activeColor : inactiveColor, fontWeight: isFocused ? '600' : '400' }]}>
+            {label}
+          </Text>
         </Animated.View>
       </View>
     </TouchableOpacity>
@@ -52,12 +57,18 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
   const position = sharedPosition; // Use the shared value we passed in
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  
+  const { theme } = useAppSettingsStore();
+  const systemColorScheme = useColorScheme();
+  const isDark = theme === 'dark' || (theme === 'system' && systemColorScheme === 'dark');
+  const blurTint = isDark ? 'dark' : 'light';
 
   const [tabLayouts, setTabLayouts] = React.useState<Record<number, { x: number, width: number, y: number, height: number }>>({});
 
   const bottomPadding = insets.bottom > 0 ? insets.bottom : 8;
 
   const onCenterPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigation.navigate('AddTransaction');
   };
 
@@ -67,13 +78,9 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       return { opacity: 0 };
     }
 
-    // Map scroll index (0-3) to tab slot index (0, 1, 3, 4)
-    // We only interpolate between the indices that have layouts AND are scrollable
-    const scrollIndices = [0, 1, 2, 3];
-    const visualSlotIndices = [0, 1, 3, 4];
-    
-    const xOutput = visualSlotIndices.map(i => tabLayouts[i]?.x ?? 0);
-    const widthOutput = visualSlotIndices.map(i => tabLayouts[i]?.width ?? 0);
+    const scrollIndices = state.routes.map((_: any, i: number) => i);
+    const xOutput = scrollIndices.map((i: number) => tabLayouts[i]?.x ?? 0);
+    const widthOutput = scrollIndices.map((i: number) => tabLayouts[i]?.width ?? 0);
 
     const translateX = interpolate(
       position.value,
@@ -89,35 +96,33 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       Extrapolate.CLAMP
     );
 
-    const tabHeight = tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.height ?? 0;
-    const paddingVal = 8; // Margin top/bottom for the pill
+    const tabHeight = tabLayouts[state.index]?.height ?? 0;
+    const paddingVal = 6; // Margin top/bottom for the pill
 
     return {
       opacity: 1,
       width,
-      height: Math.max(0, tabHeight - paddingVal * 2), // Make it slightly smaller than full height
+      height: Math.max(0, tabHeight - paddingVal * 2),
       marginTop: paddingVal,
       transform: [
         { translateX },
-        { translateY: tabLayouts[state.index === 2 ? 1 : (state.index > 2 ? state.index : state.index)]?.y ?? 0 }
+        { translateY: tabLayouts[state.index]?.y ?? 0 }
       ],
     };
-  }, [state.index, tabLayouts, position]);
+  }, [state.index, tabLayouts, position, state.routes.length]);
 
-  const renderTab = (route: any) => {
-    const routeIndex = state.routes.indexOf(route);
-    const isFocused = state.index === routeIndex;
+  const renderTab = (route: any, index: number) => {
+    const isFocused = state.index === index;
     const IconComponent = TAB_ICONS[route.name];
-    const label = route.name;
-
+    let label = route.name;
+    if (label === 'Transactions') label = 'Log'; // Shorter name for UI
+    
     const onPress = () => {
-      if (route.name === 'AddTransaction') {
-        onCenterPress();
-        return;
+      if (!isFocused) {
+        Haptics.selectionAsync();
       }
-
       if (onTabPress) {
-        onTabPress(routeIndex);
+        onTabPress(index);
       } else {
         const event = navigation.emit({
           type: 'tabPress',
@@ -134,7 +139,7 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       const { x, y, width, height } = e.nativeEvent.layout;
       setTabLayouts(prev => ({
         ...prev,
-        [routeIndex]: { x, y, width, height }
+        [index]: { x, y, width, height }
       }));
     };
 
@@ -147,53 +152,54 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
         onLayout={handleLayout}
         label={label}
         IconComponent={IconComponent}
-        activeColor={colors.primary}
-        inactiveColor={colors.text}
+        activeColor={colors.text}
+        inactiveColor={colors.textMuted}
       />
     );
   };
-
-  // Split routes: left 2, center (skip), right 2
-  const leftRoutes = state.routes.filter((_: any, i: number) => i < 2);
-  const rightRoutes = state.routes.filter((_: any, i: number) => i > 2);
 
   return (
     <View
       style={[styles.wrapper, { paddingBottom: bottomPadding }]}
       pointerEvents="box-none"
     >
-      {/* Center floating button — at top of wrapper, above the bar */}
-      <View style={styles.centerRow} pointerEvents="box-none">
-        <TouchableOpacity
-          onPress={onCenterPress}
-          activeOpacity={0.85}
-          style={[styles.centerButton, { backgroundColor: colors.text }]}
-          accessibilityRole="button"
-          accessibilityLabel="Add Transaction"
-        >
-          <Plus size={26} color={colors.background} strokeWidth={2.5} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Tab bar */}
-      <View style={[styles.bar, { backgroundColor: colors.tabBarBg, borderColor: colors.tabBarBorder, borderWidth: 1, shadowColor: '#000' }]}>
-        {/* Sliding active indicator */}
+      <BlurView intensity={80} tint={blurTint} style={[styles.leftIsland, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
         <Animated.View
           style={[
             {
               position: 'absolute',
-              backgroundColor: colors.iconBg,
-              borderRadius: 100, // Large pill
+              backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
+              borderRadius: 24,
               left: 0,
               top: 0,
             },
             indicatorStyle,
           ]}
         />
-        {leftRoutes.map(renderTab)}
-        <View style={styles.centerSpacer} />
-        {rightRoutes.map(renderTab)}
-      </View>
+        {state.routes.map((route: any, index: number) => renderTab(route, index))}
+      </BlurView>
+      
+      <BlurView 
+        intensity={100} 
+        tint="dark" 
+        style={[
+          styles.rightIsland, 
+          { 
+            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.2)',
+            backgroundColor: 'rgba(0,0,0,0.3)' 
+          }
+        ]}
+      >
+        <TouchableOpacity
+          onPress={onCenterPress}
+          activeOpacity={0.85}
+          style={[styles.centerButton]}
+          accessibilityRole="button"
+          accessibilityLabel="Add Transaction"
+        >
+          <Plus size={26} color="#ffffff" strokeWidth={2.5} />
+        </TouchableOpacity>
+      </BlurView>
     </View>
   );
 }
@@ -202,51 +208,53 @@ const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
     bottom: 0,
-    left: 12,
-    right: 12,
-  },
-  centerRow: {
-    alignItems: 'center',
-    marginBottom: -28,
-    zIndex: 10,
-  },
-  bar: {
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  leftIsland: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 36,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  rightIsland: {
+    width: 60,
+    height: 60,
     borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderRadius: 24,
-    marginHorizontal: 2,
+    marginHorizontal: 0,
   },
-  centerSpacer: {
-    width: 72,
-  },
-  centerButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 12,
-    borderWidth: 3,
-    borderColor: 'transparent',
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontFamily: fontText,
+    marginTop: 4,
+  },
+  centerButton: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

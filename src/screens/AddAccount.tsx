@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X, Landmark, CreditCard, Wallet, Check, Trash2 } from 'lucide-react-native';
+import { X, Bank, CreditCard, Wallet, Check, Trash } from 'phosphor-react-native';
 import { createAccount, updateAccount, deleteAccount } from '../features/accounts/accountService';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -10,7 +10,7 @@ import { fontDisplay, fontText } from '../theme/fonts';
 import { useRoute } from '@react-navigation/native';
 
 const ACCOUNT_TYPES = [
-  { id: 'bank', label: 'Bank Account', icon: Landmark },
+  { id: 'bank', label: 'Bank Account', icon: Bank },
   { id: 'credit', label: 'Credit Card', icon: CreditCard },
   { id: 'cash', label: 'Cash / Wallet', icon: Wallet },
 ];
@@ -104,7 +104,7 @@ export default function AddAccountScreen({ navigation }: any) {
               </Text>
               {isEditing ? (
                 <TouchableOpacity onPress={handleDelete} style={[styles.closeBtn, { backgroundColor: colors.danger + '15' }]}>
-                  <Trash2 size={18} color={colors.danger} />
+                  <Trash size={18} color={colors.danger} />
                 </TouchableOpacity>
               ) : (
                 <View style={{ width: 38 }} />

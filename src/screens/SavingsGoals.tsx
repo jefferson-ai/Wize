@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Alert } from 'react-native';
-import { X, Plus, Target, Sparkles, TrendingUp, Info } from 'lucide-react-native';
+import { X, Plus, Crosshair, Sparkle, TrendUp, Info } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -95,7 +95,7 @@ export default function SavingsGoalsScreen({ navigation }: any) {
                 </View>
                 <View style={styles.goalInfo}>
                   <View style={styles.targetRow}>
-                    <Target size={14} color={colors.textMuted} style={{ marginRight: 4 }} />
+                    <Crosshair size={14} color={colors.textMuted} style={{ marginRight: 4 }} />
                     <Text style={[styles.targetText, { color: colors.textMuted }]}>Target: GHS {formatAmount(goal.targetAmount)}</Text>
                   </View>
                 </View>
@@ -120,7 +120,7 @@ export default function SavingsGoalsScreen({ navigation }: any) {
 
         <View style={styles.milestoneBox}>
           <View style={[styles.milestoneIcon, { backgroundColor: colors.accentGreenBg }]}>
-            <TrendingUp size={20} color="#22c55e" />
+            <TrendUp size={20} color="#22c55e" />
           </View>
           <Text style={[styles.milestoneText, { color: colors.textMuted }]}>
             You've saved <Text style={{ color: colors.text, fontWeight: '700' }}>GHS 340.00</Text> across all goals this month!
