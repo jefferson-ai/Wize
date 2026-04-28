@@ -33,6 +33,7 @@ import SavingsGoalsScreen from '../screens/SavingsGoals';
 import AddSavingGoalScreen from '../screens/AddSavingGoal';
 import AccountsListScreen from '../screens/AccountsList';
 import AddAccountScreen from '../screens/AddAccount';
+import SearchTransactionsScreen from '../screens/SearchTransactionsScreen';
 
 import CustomTabBar from '../components/CustomTabBar';
 
@@ -370,6 +371,14 @@ export default function MainNavigator() {
               options={{ 
                 presentation: 'transparentModal',
                 animation: 'slide_from_bottom'
+              }}
+            />
+            <AppStack.Screen
+              name="SearchTransactions"
+              component={SearchTransactionsScreen}
+              options={{ 
+                presentation: 'modal',
+                headerShown: false
               }}
             />
           </AppStack.Navigator>

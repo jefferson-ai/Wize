@@ -1,13 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActionSheetIOS, Platform, Alert, Animated } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, ActionSheetIOS, Platform, Alert, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { PieChart } from 'react-native-gifted-charts';
 import { Eye, EyeSlash, ArrowUpRight, CaretDown, Flame, Sparkle } from 'phosphor-react-native';
 
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
-import { getDashboardSummary, getTransactions, getLoggingStreak, checkLoggedToday, logNoSpendDay } from '../features/transactions/transactionService';
+import { getDashboardSummary, getTransactions, getLoggingStreak, checkLoggedToday, logNoSpendDay, processRecurringTransactions } from '../features/transactions/transactionService';
 import { getBudgetConsumption } from '../features/budgets/budgetService';
 import { getAccounts, getTotalBalance, ensureDefaultAccount, Account } from '../features/accounts/accountService';
 import { getSavingGoals } from '../features/savings/savingsService';
@@ -19,6 +18,7 @@ import StreakBadges, { getStreakColor } from '../components/StreakBadges';
 import Confetti, { ConfettiRef } from '../components/Confetti';
 import SavingBucket from '../components/SavingBucket';
 import ShakingBell from '../components/ShakingBell';
+import AnimatedDonutChart from '../components/AnimatedDonutChart';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { TabNavigationContext } from '../navigation/navigationContext';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
@@ -27,6 +27,7 @@ import AIInsightCard from '../components/AIInsightCard';
 import { getSmartInsights, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
 import { generateNotifications, countUnread } from '../features/notifications/notificationService';
 import UpgradeModal from '../components/UpgradeModal';
+import TransactionStack from '../components/TransactionStack';
 
 const { width, height: WINDOW_HEIGHT } = Dimensions.get('window');
 
@@ -36,10 +37,6 @@ export default function HomeScreen({ navigation }: any) {
 
   const [summary, setSummary] = useState({ balance: 0, income: 0, expense: 0, categoryData: [] as any[] });
   const [chartKey, setChartKey] = useState(0);
-  const scaleAnim = useRef(new Animated.Value(0.5)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-  const translateXAnim = useRef(new Animated.Value(-50)).current;
-  const translateYAnim = useRef(new Animated.Value(50)).current;
   const [totalBalance, setTotalBalance] = useState(0);
   const [recentTx, setRecentTx] = useState<any[]>([]);
   const [budgetAlerts, setBudgetAlerts] = useState<any[]>([]);
@@ -52,8 +49,9 @@ export default function HomeScreen({ navigation }: any) {
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null });
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [isStackExpanded, setIsStackExpanded] = useState(false);
 
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<'overall' | 'monthly' | 'weekly'>('overall');
   const [accounts, setAccounts] = useState<Account[]>([]);
 
   const colors = useThemeColors();
@@ -63,6 +61,7 @@ export default function HomeScreen({ navigation }: any) {
   const confettiRef = React.useRef<ConfettiRef>(null);
   const isInitialSyncDone = React.useRef(false);
   const prevStreak = React.useRef<number | null>(null);
+  const stackSectionLayout = React.useRef({ y: 0, height: 0 });
 
   React.useEffect(() => {
     // If we haven't seen any streak yet, just record it
@@ -92,17 +91,6 @@ export default function HomeScreen({ navigation }: any) {
       // Delay slightly to ensure tab transition finishes so the spiral build is visible
       const timer = setTimeout(() => {
         setChartKey(prev => prev + 1);
-        
-        scaleAnim.setValue(0.5);
-        opacityAnim.setValue(0);
-        translateXAnim.setValue(-50);
-        translateYAnim.setValue(50);
-        Animated.parallel([
-          Animated.timing(opacityAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }),
-          Animated.spring(translateXAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true }),
-          Animated.spring(translateYAnim, { toValue: 0, friction: 6, tension: 40, useNativeDriver: true })
-        ]).start();
       }, 150);
 
       if (user?.id) {
@@ -110,15 +98,23 @@ export default function HomeScreen({ navigation }: any) {
       }
       
       return () => clearTimeout(timer);
-    }, [user?.id, selectedAccountId])
+    }, [user?.id, selectedPeriod])
   );
+
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('transaction_updated', () => {
+      if (user?.id) loadData();
+    });
+    return () => sub.remove();
+  }, [user?.id, selectedPeriod]);
 
   const loadData = async () => {
     if (!user?.id) return;
+    await processRecurringTransactions(user.id);
     await ensureDefaultAccount(user.id, currency);
 
     const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, smartInsights] = await Promise.all([
-      getDashboardSummary(user.id, selectedAccountId || undefined),
+      getDashboardSummary(user.id, undefined, selectedPeriod),
       getTotalBalance(user.id),
       getAccounts(user.id),
       getTransactions(user.id, { limit: 3 }),
@@ -160,7 +156,8 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const showFilterOptions = () => {
-    const options = ['All Accounts', ...accounts.map(a => a.name), 'Cancel'];
+    const options = ['Overall', 'This Month', 'This Week', 'Cancel'];
+    const periods: ('overall' | 'monthly' | 'weekly')[] = ['overall', 'monthly', 'weekly'];
     const cancelButtonIndex = options.length - 1;
 
     if (Platform.OS === 'ios') {
@@ -168,37 +165,44 @@ export default function HomeScreen({ navigation }: any) {
         {
           options,
           cancelButtonIndex,
-          title: 'Filter Summary',
+          title: 'Filter Chart By Period',
         },
         buttonIndex => {
-          if (buttonIndex === 0) {
-            setSelectedAccountId(null);
-          } else if (buttonIndex < cancelButtonIndex) {
-            setSelectedAccountId(accounts[buttonIndex - 1].id);
+          if (buttonIndex < cancelButtonIndex) {
+            setSelectedPeriod(periods[buttonIndex]);
           }
         }
       );
     } else {
       Alert.alert(
-        'Filter Summary',
-        'Choose a wallet to view its category breakdown.',
+        'Filter Chart By Period',
+        'Choose a time period to view.',
         options.slice(0, cancelButtonIndex).map((opt, idx) => ({
           text: opt,
-          onPress: () => {
-            if (idx === 0) setSelectedAccountId(null);
-            else setSelectedAccountId(accounts[idx - 1].id);
-          }
+          onPress: () => setSelectedPeriod(periods[idx])
         }))
       );
     }
   };
 
-  const selectedAccountName = selectedAccountId 
-    ? accounts.find(a => a.id === selectedAccountId)?.name || 'All'
-    : 'All';
+  const periodLabel = selectedPeriod === 'overall' ? 'Overall' : selectedPeriod === 'monthly' ? 'This Month' : 'This Week';
 
   const hasChartData = summary.categoryData && summary.categoryData.length > 0;
   const firstName = user?.email?.split('@')[0] || 'there';
+
+  const handleScroll = (e: any) => {
+    const offsetY = e.nativeEvent.contentOffset.y;
+    const { y, height } = stackSectionLayout.current;
+    
+    if (y > 0 && isStackExpanded) {
+      // The section is out of screen if its bottom is above the viewport 
+      // or its top is below the viewport.
+      const isOutOfScreen = (offsetY > y + height) || (offsetY + WINDOW_HEIGHT < y);
+      if (isOutOfScreen) {
+        setIsStackExpanded(false);
+      }
+    }
+  };
 
   const handleNoSpend = async () => {
     if (!user?.id) return;
@@ -240,6 +244,8 @@ export default function HomeScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
         style={{ flex: 1, backgroundColor: 'transparent' }}
         contentContainerStyle={{ paddingBottom: 110 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <View style={{ height: headerInset }} collapsable={false} />
         <View
@@ -342,67 +348,19 @@ export default function HomeScreen({ navigation }: any) {
                 onPress={showFilterOptions}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.chartDropdownText, { color: colors.textMuted }]}>{selectedAccountName}</Text>
+                <Text style={[styles.chartDropdownText, { color: colors.textMuted }]}>{periodLabel}</Text>
                 <CaretDown size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
             </View>
 
             {hasChartData ? (
-              <>
-                <Animated.View style={[styles.chartWrapper, { 
-                  opacity: opacityAnim, 
-                  transform: [
-                    { translateX: translateXAnim },
-                    { translateY: translateYAnim },
-                    { scale: scaleAnim }
-                  ] 
-                }]}>
-                  <PieChart
-                    key={chartKey}
-                    isAnimated
-                    animationDuration={1200}
-                    donut
-                    innerRadius={65}
-                    radius={85}
-                    strokeWidth={4}
-                    strokeColor={colors.card}
-                    innerCircleColor={colors.card}
-                    data={summary.categoryData}
-                    centerLabelComponent={() => {
-                      const topCat = summary.categoryData[0];
-                      const pct = summary.expense > 0 && topCat ? ((topCat.value / summary.expense) * 100).toFixed(0) : '0';
-                      return (
-                        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16, fontFamily: fontText }}>
-                            {topCat ? topCat.label : 'Expenses'}
-                          </Text>
-                          <Text style={{ color: colors.textMuted, fontSize: 13, fontFamily: fontText, marginTop: 2 }}>
-                            {topCat ? `${pct}%` : `${currency} ${formatAmount(summary.expense)}`}
-                          </Text>
-                        </View>
-                      )
-                    }}
-                  />
-                </Animated.View>
-
-                {/* Legend */}
-                <View style={styles.legendContainer}>
-                  {summary.categoryData.slice(0, 4).map((cat: any, i: number) => {
-                    const percentage = summary.expense > 0 ? ((cat.value / summary.expense) * 100).toFixed(0) : '0';
-                    return (
-                      <React.Fragment key={i}>
-                        <View style={styles.legendItem}>
-                          <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
-                          <Text style={[styles.legendText, { color: colors.textMuted }]}>{cat.label}:{percentage}%</Text>
-                        </View>
-                        {i < Math.min(summary.categoryData.length, 4) - 1 && (
-                          <View style={[styles.legendDivider, { backgroundColor: colors.border }]} />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </View>
-              </>
+              <AnimatedDonutChart
+                data={summary.categoryData}
+                totalValue={summary.expense}
+                radius={65}
+                strokeWidth={16}
+                chartKey={chartKey}
+              />
             ) : (
               <View style={{ height: 160, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: colors.textMuted, fontFamily: fontText }}>No expenses yet</Text>
@@ -525,49 +483,47 @@ export default function HomeScreen({ navigation }: any) {
         )}
 
 
-        {/* Recent Transactions */}
-        <View style={styles.section}>
+        {/* Latest Transactions */}
+        <View 
+          style={styles.section}
+          onLayout={(e) => {
+            stackSectionLayout.current = {
+              y: e.nativeEvent.layout.y,
+              height: e.nativeEvent.layout.height
+            };
+          }}
+        >
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Transactions</Text>
-            <TouchableOpacity
-              onPress={() => tabNav?.jumpToTab('Transactions')}
-              accessibilityRole="button"
-              accessibilityLabel="See all transactions"
-              style={styles.seeAllBtn}
-            >
-              <Text style={[styles.seeAllText, { color: colors.text }]}>See All</Text>
-              <ArrowUpRight size={14} color={colors.text} weight="bold" />
-            </TouchableOpacity>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Latest Transactions</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {isStackExpanded && (
+                <TouchableOpacity
+                  onPress={() => setIsStackExpanded(false)}
+                  activeOpacity={0.6}
+                  style={[styles.showLessBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                >
+                  <CaretDown size={12} color={colors.textMuted} weight="bold" />
+                  <Text style={[styles.showLessText, { color: colors.textMuted }]}>Show less</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => tabNav?.jumpToTab('Transactions')}
+                accessibilityRole="button"
+                accessibilityLabel="See all transactions"
+                style={styles.seeAllBtn}
+              >
+                <Text style={[styles.seeAllText, { color: colors.text }]}>See All</Text>
+                <ArrowUpRight size={14} color={colors.text} weight="bold" />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {recentTx.length === 0 ? (
-            <Text style={styles.emptyText}>No recent transactions</Text>
-          ) : (
-            recentTx.map(tx => (
-              <TouchableOpacity
-                key={tx.id}
-                style={[styles.txRow, { backgroundColor: colors.card }]}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('EditTransaction', { transaction: tx })}
-                accessibilityRole="button"
-                accessibilityLabel={`Edit ${tx.category?.name || 'Unknown'} transaction`}
-              >
-                <View style={[styles.txIcon, { backgroundColor: (tx.category?.color || '#94a3b8') + '22' }]}>
-                  <CategoryIcon categoryName={tx.category?.name} size={20} color={tx.category?.color || '#94a3b8'} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.txName, { color: colors.text }]}>{tx.category?.name || 'Unknown'}</Text>
-                  {tx.note && <Text style={[styles.txNote, { color: colors.textMuted }]} numberOfLines={1}>{tx.note}</Text>}
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.txAmount, { color: tx.type === 'income' ? colors.success : colors.danger }]}>
-                    {tx.type === 'income' ? '+' : '-'}{currency} {formatAmount(tx.amount)}
-                  </Text>
-                  <Text style={[styles.txDate, { color: colors.textMuted }]}>{new Date(tx.date).toLocaleDateString()}</Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
+          <TransactionStack 
+            transactions={recentTx} 
+            currency={currency} 
+            isExpanded={isStackExpanded}
+            onToggleExpand={() => setIsStackExpanded(!isStackExpanded)}
+          />
         </View>
       </View>
     </ScrollView>
@@ -642,6 +598,8 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   seeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   seeAllText: { fontSize: 13, fontWeight: '600', color: '#212529', fontFamily: fontRounded },
+  showLessBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
+  showLessText: { fontSize: 12, fontWeight: '600', fontFamily: fontRounded },
 
   // Chart
   chartCard: { backgroundColor: '#ffffff', borderRadius: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3 },

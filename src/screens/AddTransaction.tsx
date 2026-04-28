@@ -9,16 +9,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  ActivityIndicator
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { X, Tag, FileText, CalendarBlank, CaretLeft, CaretRight, Check, Wallet } from 'phosphor-react-native';
+import { X, Tag, FileText, CalendarBlank, CaretLeft, CaretRight, Check, Wallet, Repeat, Sparkle } from 'phosphor-react-native';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { addTransaction } from '../features/transactions/transactionService';
 import { getCategories, addCustomCategory } from '../features/categories/categoryService';
 import { getAccounts, ensureDefaultAccount } from '../features/accounts/accountService';
+import { parseTransactionText } from '../features/ai/aiService';
 import CategoryIcon from '../components/CategoryIcon';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontText } from '../theme/fonts';
@@ -44,6 +46,12 @@ export default function AddTransactionScreen({ navigation, route }: any) {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [showAccounts, setShowAccounts] = useState(false);
+
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceType, setRecurrenceType] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+
+  const [aiInput, setAiInput] = useState('');
+  const [isParsing, setIsParsing] = useState(false);
 
   const amountRef = useRef<TextInput>(null);
   const customInputRef = useRef<TextInput>(null);
@@ -108,6 +116,39 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     finally { setAddingCustom(false); }
   };
 
+  const handleParseAI = async () => {
+    if (!aiInput.trim()) return;
+    setIsParsing(true);
+    
+    const allCats = await getCategories(user?.id || '');
+    const mappedCats = allCats.map(c => ({ id: c.id, name: c.name, type: c.type }));
+    
+    try {
+      const result = await parseTransactionText(aiInput, mappedCats);
+      if (result) {
+        if (result.type) setType(result.type);
+        if (result.amount) setAmountStr(result.amount.toString());
+        if (result.categoryId) {
+          if (allCats.find(c => c.id === result.categoryId)) {
+            setSelectedCategory(result.categoryId);
+          }
+        }
+        if (result.note) setNote(result.note);
+        if (result.date) setDate(new Date(result.date));
+        
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setAiInput('');
+      } else {
+        Alert.alert('AI Error', 'Could not extract transaction details.');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('AI Error', 'Failed to parse text.');
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
   const handleSubmit = async () => {
     const amount = parseFloat(amountStr);
     if (!amountStr || amount <= 0) { Alert.alert('Invalid Amount', 'Enter an amount greater than 0'); return; }
@@ -124,8 +165,10 @@ export default function AddTransactionScreen({ navigation, route }: any) {
         accountId: selectedAccountId,
         date: date.toISOString(),
         note: note || null,
-        receiptUrl: null
-      });
+        receiptUrl: null,
+        isRecurring,
+        recurrenceType: isRecurring ? recurrenceType : null,
+      } as any);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       if (navigation.canGoBack()) navigation.goBack();
     } catch { Alert.alert('Error', 'Failed to add transaction'); }
@@ -135,13 +178,11 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     <View style={styles.overlay}>
       <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => navigation.canGoBack() && navigation.goBack()} />
       <View style={[styles.sheet, { backgroundColor: colors.card }]}>
-        {/* Drag handle */}
         <View style={[styles.handle, { backgroundColor: colors.handle }]} />
         <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
               
-              {/* Header */}
               <View style={styles.modalHeader}>
                 <TouchableOpacity
                   onPress={() => navigation.canGoBack() && navigation.goBack()}
@@ -155,7 +196,29 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                 <View style={{ width: 38 }} />
               </View>
 
-              {/* Type Toggle */}
+              <View style={[styles.aiInputContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Sparkle size={20} color="#8b5cf6" weight="fill" />
+                <TextInput
+                  style={[styles.aiInputField, { color: colors.text }]}
+                  placeholder="e.g. Spent 45 on coffee yesterday..."
+                  placeholderTextColor={colors.textMuted}
+                  value={aiInput}
+                  onChangeText={setAiInput}
+                  onSubmitEditing={handleParseAI}
+                  returnKeyType="go"
+                  editable={!isParsing}
+                />
+                {isParsing ? (
+                  <ActivityIndicator size="small" color="#8b5cf6" />
+                ) : (
+                  aiInput.trim().length > 0 && (
+                    <TouchableOpacity onPress={handleParseAI} style={[styles.aiGoBtn, { backgroundColor: '#8b5cf6' }]}>
+                      <Text style={styles.aiGoBtnText}>Auto-fill</Text>
+                    </TouchableOpacity>
+                  )
+                )}
+              </View>
+
               <View style={[styles.typeToggle, { backgroundColor: colors.background }]}>
                 <TouchableOpacity
                   onPress={() => { Haptics.selectionAsync(); setType('expense'); }}
@@ -171,7 +234,6 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                 </TouchableOpacity>
               </View>
 
-              {/* Amount */}
               <TouchableOpacity style={styles.amountArea} activeOpacity={1} onPress={() => amountRef.current?.focus()}>
                 <View style={styles.amountRow}>
                   <Text style={styles.currencySymbol}>{currency}</Text>
@@ -195,10 +257,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
 
               <View style={[styles.divider, { backgroundColor: colors.background }]} />
 
-              {/* Fields */}
               <View style={styles.fields}>
-
-                {/* Category */}
                 <TouchableOpacity
                   style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background }]}
                   onPress={() => { setShowCategories(!showCategories); setShowCustomInput(false); }}
@@ -219,7 +278,6 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                   <Text style={styles.chevronText}>{showCategories ? '▲' : '▼'}</Text>
                 </TouchableOpacity>
 
-                {/* Category Grid (expandable) */}
                 {showCategories && (
                   <View style={[styles.categoriesBlock, { borderBottomColor: colors.background }]}>
                     <View style={styles.categoryGrid}>
@@ -270,7 +328,6 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                   </View>
                 )}
 
-                {/* Account Selection */}
                 <TouchableOpacity
                   style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background }]}
                   onPress={() => { setShowAccounts(!showAccounts); setShowCategories(false); }}
@@ -313,7 +370,6 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                   </View>
                 )}
 
-                {/* Note */}
                 <View style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background }]}>
                   <View style={[styles.fieldIcon, { backgroundColor: colors.accentYellowBg }]}>
                     <FileText size={16} color="#ca8a04" />
@@ -327,7 +383,6 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                   />
                 </View>
 
-                {/* Date */}
                 <View style={styles.fieldRow}>
                   <View style={[styles.fieldIcon, { backgroundColor: colors.accentCalendarBg }]}>
                     <CalendarBlank size={16} color="#3b82f6" />
@@ -359,10 +414,38 @@ export default function AddTransactionScreen({ navigation, route }: any) {
                     }}
                   />
                 )}
+
+                <View style={[styles.fieldRow, styles.fieldRowBorder, { borderBottomColor: colors.background, paddingVertical: 12 }]}>
+                  <View style={[styles.fieldIcon, { backgroundColor: isRecurring ? colors.success + '20' : colors.border }]}>
+                    <Repeat size={16} color={isRecurring ? colors.success : colors.textMuted} />
+                  </View>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Recurring</Text>
+                  <View style={{ flex: 1 }} />
+                  
+                  {isRecurring ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, borderRadius: 16, padding: 4 }}>
+                       <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setRecurrenceType('daily'); }} style={[styles.recurrenceOption, recurrenceType === 'daily' && { backgroundColor: colors.text }]}>
+                         <Text style={[styles.recurrenceText, recurrenceType === 'daily' && { color: colors.background }]}>Daily</Text>
+                       </TouchableOpacity>
+                       <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setRecurrenceType('weekly'); }} style={[styles.recurrenceOption, recurrenceType === 'weekly' && { backgroundColor: colors.text }]}>
+                         <Text style={[styles.recurrenceText, recurrenceType === 'weekly' && { color: colors.background }]}>Weekly</Text>
+                       </TouchableOpacity>
+                       <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setRecurrenceType('monthly'); }} style={[styles.recurrenceOption, recurrenceType === 'monthly' && { backgroundColor: colors.text }]}>
+                         <Text style={[styles.recurrenceText, recurrenceType === 'monthly' && { color: colors.background }]}>Monthly</Text>
+                       </TouchableOpacity>
+                       <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setIsRecurring(false); }} style={{ padding: 6, marginLeft: 4 }}>
+                         <X size={14} color={colors.textMuted} weight="bold" />
+                       </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setIsRecurring(true); }} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.background, borderRadius: 12 }}>
+                      <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600', fontFamily: fontText }}>Enable</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
             </ScrollView>
 
-            {/* Save Button */}
             <View style={styles.saveArea}>
               <TouchableOpacity onPress={handleSubmit} style={[styles.saveBtn, { backgroundColor: colors.text }]} activeOpacity={0.85}>
                 <Text style={[styles.saveBtnText, { color: colors.background }]}>Save Transaction</Text>
@@ -384,11 +467,14 @@ const styles = StyleSheet.create({
   closeBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
   modalTitle: { fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, fontFamily: fontDisplay },
 
+  aiInputContainer: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginTop: 10, marginBottom: 15, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, borderWidth: 1 },
+  aiInputField: { flex: 1, marginLeft: 10, fontSize: 15, fontFamily: fontText },
+  aiGoBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, marginLeft: 8 },
+  aiGoBtnText: { color: '#fff', fontSize: 12, fontWeight: '700', fontFamily: fontText },
+
   typeToggle: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f5f6f7', borderRadius: 20, padding: 4, marginBottom: 20 },
   typeBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 16 },
-  typeBtnActive: { backgroundColor: '#212529' },
   typeBtnText: { fontSize: 13, fontWeight: '600', color: '#9aa2ad', fontFamily: fontText },
-  typeBtnTextActive: { color: '#ffffff' },
 
   amountArea: { alignItems: 'center', paddingHorizontal: 24, paddingBottom: 24 },
   amountRow: { flexDirection: 'row', alignItems: 'baseline' },
@@ -423,6 +509,9 @@ const styles = StyleSheet.create({
   dateText: { flex: 1, fontSize: 15, fontWeight: '600', color: '#212529', fontFamily: fontText },
   dateControls: { flexDirection: 'row', gap: 6 },
   dateBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
+
+  recurrenceOption: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+  recurrenceText: { fontSize: 12, fontWeight: '600', color: '#9aa2ad', fontFamily: fontText },
 
   saveArea: { paddingHorizontal: 20, paddingBottom: 12, paddingTop: 10 },
   saveBtn: { backgroundColor: '#212529', borderRadius: 20, alignItems: 'center', paddingVertical: 18 },

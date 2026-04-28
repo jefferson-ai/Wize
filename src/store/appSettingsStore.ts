@@ -11,6 +11,7 @@ interface AppSettingsState {
   isPro: boolean;
   lastNotificationViewedAt: string | null;
   dismissedNotificationIds: string[];
+  reportNotifications: boolean;
   setOnboarded: (val: boolean) => void;
   setHasSeenWelcomeCarousel: (val: boolean) => void;
   setCurrency: (val: string) => void;
@@ -19,6 +20,7 @@ interface AppSettingsState {
   setIsPro: (val: boolean) => void;
   setLastNotificationViewedAt: (val: string) => void;
   dismissNotification: (id: string) => void;
+  setReportNotifications: (val: boolean) => void;
 }
 
 export const useAppSettingsStore = create<AppSettingsState>()(
@@ -32,6 +34,7 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       isPro: false,
       lastNotificationViewedAt: null,
       dismissedNotificationIds: [],
+      reportNotifications: false,
       setOnboarded: (val) => set({ isOnboarded: val }),
       setHasSeenWelcomeCarousel: (val) => set({ hasSeenWelcomeCarousel: val }),
       setCurrency: (val) => set({ currency: val }),
@@ -42,6 +45,7 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       dismissNotification: (id) => set((state) => ({ 
         dismissedNotificationIds: [...state.dismissedNotificationIds, id] 
       })),
+      setReportNotifications: (val) => set({ reportNotifications: val }),
     }),
     {
       name: 'app-settings-storage', // unique name

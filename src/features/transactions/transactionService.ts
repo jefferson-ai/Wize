@@ -1,9 +1,10 @@
 import { db } from '../../db';
 import { transactions, categories } from '../../db/schema';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, gte } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 import { syncData } from '../sync/syncService';
 import { updateAccountBalance, ensureDefaultAccount } from '../accounts/accountService';
+import { DeviceEventEmitter } from 'react-native';
 
 const generateId = () => Crypto.randomUUID();
 
@@ -16,7 +17,21 @@ export async function addTransaction(data: Omit<TransactionInsert, 'id' | 'creat
       id: generateId(),
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
+    } as any; // Cast to any to safely append nextRecurrenceDate if not provided in data
+
+    if (newTx.isRecurring && newTx.recurrenceType && !newTx.nextRecurrenceDate) {
+      const initialDate = new Date(newTx.date);
+      let nextDate = new Date(initialDate);
+      if (newTx.recurrenceType === 'daily') {
+        nextDate.setDate(nextDate.getDate() + 1);
+      } else if (newTx.recurrenceType === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7);
+      } else if (newTx.recurrenceType === 'monthly') {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+      }
+      newTx.nextRecurrenceDate = nextDate.toISOString();
+    }
+
     // Update account balance
     if (newTx.accountId) {
       const balanceAdjustment = newTx.type === 'income' ? newTx.amount : -newTx.amount;
@@ -30,6 +45,7 @@ export async function addTransaction(data: Omit<TransactionInsert, 'id' | 'creat
     if (newTx.userId) {
       syncData(newTx.userId).catch(console.error);
     }
+    DeviceEventEmitter.emit('transaction_updated');
 
     return newTx;
   } catch (err) {
@@ -73,6 +89,7 @@ export async function updateTransaction(
       .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
 
     syncData(userId).catch(console.error);
+    DeviceEventEmitter.emit('transaction_updated');
   } catch (err) {
     console.error('Error updating transaction', err);
     throw err;
@@ -97,6 +114,7 @@ export async function deleteTransaction(id: string, userId: string) {
       .delete(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
     syncData(userId).catch(console.error);
+    DeviceEventEmitter.emit('transaction_updated');
   } catch (err) {
     console.error('Error deleting transaction', err);
     throw err;
@@ -112,6 +130,9 @@ export async function getTransactions(
     accountId?: string;
     startDate?: Date;
     endDate?: Date;
+    search?: string;
+    minAmount?: number;
+    maxAmount?: number;
   }
 ) {
   try {
@@ -132,6 +153,16 @@ export async function getTransactions(
     }
     if (filters?.endDate) {
       conditions.push(sql`${transactions.date} <= ${filters.endDate.toISOString()}`);
+    }
+    if (filters?.minAmount !== undefined) {
+      conditions.push(sql`${transactions.amount} >= ${filters.minAmount}`);
+    }
+    if (filters?.maxAmount !== undefined) {
+      conditions.push(sql`${transactions.amount} <= ${filters.maxAmount}`);
+    }
+    if (filters?.search) {
+      const searchPattern = `%${filters.search}%`;
+      conditions.push(sql`(${transactions.note} LIKE ${searchPattern} OR ${categories.name} LIKE ${searchPattern})`);
     }
 
     const query = db
@@ -166,11 +197,25 @@ export async function getTransactions(
   }
 }
 
-export async function getDashboardSummary(userId: string, accountId?: string) {
+export async function getDashboardSummary(userId: string, accountId?: string, period: 'overall' | 'monthly' | 'weekly' = 'overall') {
   try {
     let conditions = [eq(transactions.userId, userId)];
     if (accountId) {
       conditions.push(eq(transactions.accountId, accountId));
+    }
+
+    if (period !== 'overall') {
+      const now = new Date();
+      if (period === 'monthly') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        conditions.push(gte(transactions.date, startOfMonth.toISOString()));
+      } else if (period === 'weekly') {
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        startOfWeek.setHours(0, 0, 0, 0);
+        conditions.push(gte(transactions.date, startOfWeek.toISOString()));
+      }
     }
 
     const allTx = await db
@@ -316,9 +361,241 @@ export async function logNoSpendDay(userId: string, currency: string) {
       receiptUrl: null,
       isRecurring: false,
       recurrenceType: null,
-    });
+    } as any);
   } catch (err) {
     console.error('Error logging no spend day', err);
     throw err;
   }
 }
+
+export async function processRecurringTransactions(userId: string) {
+  try {
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const recurringTxs = await db.select().from(transactions).where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.isRecurring, true),
+        sql`${transactions.nextRecurrenceDate} <= ${nowIso}`
+      )
+    );
+
+    for (const template of recurringTxs) {
+      if (!template.nextRecurrenceDate) continue;
+
+      let nextDateObj = new Date(template.nextRecurrenceDate);
+      
+      // We might have missed multiple occurrences if app was not opened for a while
+      // We will loop to catch up
+      while (nextDateObj <= now) {
+         // Create the instance
+         const newInstance = {
+           userId: template.userId!,
+           type: template.type,
+           amount: template.amount,
+           currency: template.currency,
+           categoryId: template.categoryId,
+           accountId: template.accountId,
+           date: nextDateObj.toISOString(),
+           note: `${template.note || ''} [Auto-Logged]`.trim(),
+           receiptUrl: template.receiptUrl,
+           isRecurring: false, // Instance is not a template
+           recurrenceType: null,
+           nextRecurrenceDate: null
+         };
+         
+         await addTransaction(newInstance as any);
+         
+         // Advance nextDateObj
+         if (template.recurrenceType === 'daily') {
+           nextDateObj.setDate(nextDateObj.getDate() + 1);
+         } else if (template.recurrenceType === 'weekly') {
+           nextDateObj.setDate(nextDateObj.getDate() + 7);
+         } else if (template.recurrenceType === 'monthly') {
+           nextDateObj.setMonth(nextDateObj.getMonth() + 1);
+         } else {
+           break; // safety fallback
+         }
+      }
+
+      // Update template's nextRecurrenceDate
+      await db.update(transactions)
+        .set({ nextRecurrenceDate: nextDateObj.toISOString(), updatedAt: new Date() })
+        .where(eq(transactions.id, template.id));
+    }
+  } catch (err) {
+    console.error('Error processing recurring transactions', err);
+  }
+}
+
+export async function getSpendingReport(userId: string, period: 'weekly' | 'monthly') {
+  try {
+    const now = new Date();
+    
+    let currentStart = new Date();
+    let currentEnd = new Date();
+    let previousStart = new Date();
+    let previousEnd = new Date();
+
+    if (period === 'weekly') {
+      // Current week (Mon-Sun)
+      const day = now.getDay() || 7; // Sunday is 0, make it 7
+      currentStart.setDate(now.getDate() - day + 1);
+      currentStart.setHours(0, 0, 0, 0);
+      currentEnd = new Date(currentStart);
+      currentEnd.setDate(currentStart.getDate() + 6);
+      currentEnd.setHours(23, 59, 59, 999);
+
+      // Previous week
+      previousStart = new Date(currentStart);
+      previousStart.setDate(previousStart.getDate() - 7);
+      previousEnd = new Date(currentEnd);
+      previousEnd.setDate(previousEnd.getDate() - 7);
+    } else {
+      // Current month
+      currentStart.setDate(1);
+      currentStart.setHours(0, 0, 0, 0);
+      currentEnd = new Date(currentStart.getFullYear(), currentStart.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      // Previous month
+      previousStart = new Date(currentStart);
+      previousStart.setMonth(previousStart.getMonth() - 1);
+      previousEnd = new Date(currentStart.getFullYear(), currentStart.getMonth(), 0, 23, 59, 59, 999);
+    }
+
+    const currentStartIso = currentStart.toISOString();
+    const currentEndIso = currentEnd.toISOString();
+    const previousStartIso = previousStart.toISOString();
+    const previousEndIso = previousEnd.toISOString();
+
+    const [currentTx, previousTx] = await Promise.all([
+      db.select({
+        amount: transactions.amount,
+        date: transactions.date,
+        type: transactions.type,
+        categoryId: transactions.categoryId,
+        categoryName: categories.name,
+        categoryColor: categories.color,
+        categoryIcon: categories.icon,
+      })
+      .from(transactions)
+      .leftJoin(categories, eq(transactions.categoryId, categories.id))
+      .where(and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, 'expense'),
+        sql`${transactions.date} >= ${currentStartIso}`,
+        sql`${transactions.date} <= ${currentEndIso}`
+      )),
+      
+      db.select({
+        amount: transactions.amount,
+      })
+      .from(transactions)
+      .where(and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, 'expense'),
+        sql`${transactions.date} >= ${previousStartIso}`,
+        sql`${transactions.date} <= ${previousEndIso}`
+      ))
+    ]);
+
+    let currentTotal = 0;
+    let previousTotal = 0;
+    
+    currentTx.forEach(tx => currentTotal += tx.amount);
+    previousTx.forEach(tx => previousTotal += tx.amount);
+
+    let percentageChange = 0;
+    if (previousTotal > 0) {
+      percentageChange = ((currentTotal - previousTotal) / previousTotal) * 100;
+    } else if (currentTotal > 0) {
+      percentageChange = 100;
+    }
+
+    // Top categories
+    const catMap: Record<string, { name: string; color: string; icon: string; amount: number }> = {};
+    currentTx.forEach(tx => {
+      const cName = tx.categoryName || 'Uncategorized';
+      if (!catMap[cName]) {
+         catMap[cName] = { 
+           name: cName, 
+           color: tx.categoryColor || '#94a3b8', 
+           icon: tx.categoryIcon || 'Tag', 
+           amount: 0 
+         };
+      }
+      catMap[cName].amount += tx.amount;
+    });
+
+    const topCategories = Object.values(catMap).sort((a, b) => b.amount - a.amount);
+
+    // Chart Data
+    const dailyMap: Record<string, number> = {};
+    let cursor = new Date(currentStart);
+    while (cursor <= currentEnd) {
+       const key = cursor.toISOString().split('T')[0]; // YYYY-MM-DD
+       dailyMap[key] = 0;
+       cursor.setDate(cursor.getDate() + 1);
+    }
+    
+    currentTx.forEach(tx => {
+       const key = tx.date.split('T')[0];
+       if (dailyMap[key] !== undefined) {
+         dailyMap[key] += tx.amount;
+       }
+    });
+
+    let chartData: { label: string; value: number }[];
+
+    if (period === 'weekly') {
+      // Daily bars with weekday labels
+      chartData = Object.keys(dailyMap).sort().map(date => {
+        const d = new Date(date);
+        return {
+          label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+          value: dailyMap[date]
+        };
+      });
+    } else {
+      // Monthly: aggregate into weekly buckets for readability
+      const sortedDates = Object.keys(dailyMap).sort();
+      const lastDay = new Date(sortedDates[sortedDates.length - 1]).getDate();
+      const weekBuckets: { start: number; end: number; value: number }[] = [];
+      
+      // Create buckets: 1-7, 8-14, 15-21, 22-end
+      const ranges = [
+        [1, 7], [8, 14], [15, 21], [22, lastDay]
+      ];
+      
+      for (const [start, end] of ranges) {
+        let total = 0;
+        sortedDates.forEach(date => {
+          const day = new Date(date).getDate();
+          if (day >= start && day <= end) {
+            total += dailyMap[date];
+          }
+        });
+        weekBuckets.push({ start, end, value: total });
+      }
+
+      chartData = weekBuckets.map(bucket => ({
+        label: `${bucket.start}-${bucket.end}`,
+        value: bucket.value
+      }));
+    }
+
+    return {
+      currentTotal,
+      previousTotal,
+      percentageChange,
+      topCategories,
+      chartData
+    };
+
+  } catch(err) {
+    console.error('Error fetching spending report', err);
+    return null;
+  }
+}
+

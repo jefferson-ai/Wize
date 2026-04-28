@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `next_recurrence_date` text;

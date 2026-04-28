@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet, Animated, Alert, TextInput, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Funnel, Plus, Trash } from 'phosphor-react-native';
+import { ArrowLeft, Funnel, Plus, Trash, MagnifyingGlass, X } from 'phosphor-react-native';
 import { Swipeable, RectButton, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
-import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, interpolateColor } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, interpolateColor, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -13,7 +13,7 @@ import { getAccounts } from '../features/accounts/accountService';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import CategoryIcon from '../components/CategoryIcon';
 import { formatAmount } from '../utils/formatters';
-import RadarChart from '../components/RadarChart';
+import { LineChart } from 'react-native-gifted-charts';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { HeaderRegistrar } from '../components/AnimatedHeader';
 import { useTabHeaderInset } from '../navigation/tabHeaderInset';
@@ -62,10 +62,9 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
-
-
   const [showFilters, setShowFilters] = useState(false);
-
+  const [minAmount, setMinAmount] = useState<string>('');
+  const [maxAmount, setMaxAmount] = useState<string>('');
 
   const [filterType, setFilterType] = useState<'income' | 'expense' | null>(null);
   const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null);
@@ -78,6 +77,18 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   const confettiRef = useRef<ConfettiRef>(null);
   const prevStreak = useRef<number | null>(null);
 
+  // ── Chart Card Animations ─────────────────────────────────────────
+  const labelOpacity    = useSharedValue(0);
+  const labelTranslateY = useSharedValue(8);
+  const badgeOpacity    = useSharedValue(0);
+  const badgeTranslateY = useSharedValue(8);
+  const totalOpacity    = useSharedValue(0);
+  const totalTranslateY = useSharedValue(8);
+  const chartRevealProgress = useSharedValue(0);
+
+  const [displayedTotal, setDisplayedTotal] = useState(0);
+  const chartWidth = useMemo(() => Dimensions.get('window').width - 80, []);
+
   const monthScrollRef = useRef<ScrollView>(null);
   const switchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -89,6 +100,126 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   const layouts = useRef<Record<string, { x: number, y: number, width: number, height: number }>>({}).current;
   const [layoutTrigger, setLayoutTrigger] = useState(0);
 
+  // Line chart: compare selected month vs previous month cumulative spending
+  const lineChartData = useMemo(() => {
+    if (!selectedMonth || transactions.length === 0) return { currentData: [], prevData: [], max: 0 };
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+
+    const daysInCurrentMonth = new Date(year, month, 0).getDate();
+    const daysInPrevMonth = new Date(prevYear, prevMonth, 0).getDate();
+    const maxDays = Math.max(daysInCurrentMonth, daysInPrevMonth);
+
+    const currentDaily = new Array(maxDays).fill(0);
+    const prevDaily = new Array(maxDays).fill(0);
+
+    transactions.forEach(tx => {
+      if (tx.type !== radarType) return;
+      const d = new Date(tx.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const rawDayIndex = d.getDate() - 1;
+      
+      if (key === selectedMonth) {
+        const dayIndex = Math.min(rawDayIndex, daysInCurrentMonth - 1);
+        currentDaily[dayIndex] += tx.amount;
+      } else if (key === prevKey) {
+        const dayIndex = Math.min(rawDayIndex, daysInPrevMonth - 1);
+        prevDaily[dayIndex] += tx.amount;
+      }
+    });
+
+    let currentSum = 0;
+    const currentData = currentDaily.map((val, idx) => {
+      currentSum += val;
+      const isFirst = idx === 0;
+      const isLast = idx === maxDays - 1;
+      const isMultipleOf5 = (idx + 1) % 5 === 0;
+      const isFarFromEnd = (maxDays - 1) - idx > 1;
+      
+      let labelStr = '';
+      if (isFirst || isLast || (isMultipleOf5 && isFarFromEnd)) {
+        labelStr = String(idx + 1);
+      }
+
+      // Mark the end of the shorter month
+      if (daysInCurrentMonth < maxDays && idx === daysInCurrentMonth - 1) {
+        labelStr = `${MONTH_NAMES[month - 1]} end`;
+      } else if (daysInPrevMonth < maxDays && idx === daysInPrevMonth - 1) {
+        labelStr = `${MONTH_NAMES[prevMonth - 1]} end`;
+      }
+
+      return { value: currentSum, label: labelStr, hideDataPoint: true };
+    });
+
+    let prevSum = 0;
+    const prevData = prevDaily.map((val) => {
+      prevSum += val;
+      return { value: prevSum, hideDataPoint: true };
+    });
+
+    const maxVal = Math.max(...currentData.map(d => d.value), ...prevData.map(d => d.value));
+    return { currentData, prevData, max: maxVal > 0 ? maxVal : 100 };
+  }, [transactions, selectedMonth, radarType]);
+
+  const comparisonData = useMemo(() => {
+    if (!selectedMonth || transactions.length === 0) return null;
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    const prevDate = new Date(prevYear, prevMonth - 1, 1);
+    const prevMonthName = prevDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+    let currentExp = 0, prevExp = 0;
+    transactions.forEach(tx => {
+      if (tx.type !== radarType) return;
+      const d = new Date(tx.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (key === selectedMonth) currentExp += tx.amount;
+      else if (key === prevKey) prevExp += tx.amount;
+    });
+
+    const change = prevExp > 0 ? ((currentExp - prevExp) / prevExp * 100) : 0;
+    return { currentExp, prevExp, change, prevMonthName };
+  }, [transactions, selectedMonth, radarType]);
+
+  // Trigger chart card animations whenever radarType or data changes
+  useEffect(() => {
+    if (!comparisonData) return;
+
+    const timingOpts = (dur: number) => ({ duration: dur, easing: Easing.out(Easing.cubic) });
+
+    // 1. Fade-up staggered text animations
+    labelOpacity.value = 0; labelTranslateY.value = 8;
+    badgeOpacity.value = 0; badgeTranslateY.value = 8;
+    totalOpacity.value = 0; totalTranslateY.value = 8;
+
+    labelOpacity.value = withDelay(200, withTiming(1, timingOpts(350)));
+    labelTranslateY.value = withDelay(200, withTiming(0, timingOpts(350)));
+    badgeOpacity.value = withDelay(350, withTiming(1, timingOpts(350)));
+    badgeTranslateY.value = withDelay(350, withTiming(0, timingOpts(350)));
+    totalOpacity.value = withDelay(500, withTiming(1, timingOpts(400)));
+    totalTranslateY.value = withDelay(500, withTiming(0, timingOpts(400)));
+
+    // 2. Set total immediately to prevent state-update thrashing and 60fps re-renders
+    setDisplayedTotal(comparisonData.currentExp);
+
+    // 3. Left-to-right chart reveal
+    chartRevealProgress.value = 0;
+    chartRevealProgress.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
+  }, [radarType, comparisonData?.currentExp, comparisonData?.prevExp]);
+
+  const labelFadeStyle  = useAnimatedStyle(() => ({ opacity: labelOpacity.value,  transform: [{ translateY: labelTranslateY.value  }] }));
+  const badgeFadeStyle  = useAnimatedStyle(() => ({ opacity: badgeOpacity.value,  transform: [{ translateY: badgeTranslateY.value  }] }));
+  const totalFadeStyle  = useAnimatedStyle(() => ({ opacity: totalOpacity.value,  transform: [{ translateY: totalTranslateY.value  }] }));
+  
+  const chartRevealStyle = useAnimatedStyle(() => ({
+    width: chartWidth * chartRevealProgress.value,
+  }));
+  // ─────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (activeMonth && layouts[activeMonth]) {
       const target = layouts[activeMonth];
@@ -99,6 +230,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       pillHeight.value = withTiming(target.height, timingConfig);
     }
   }, [activeMonth, layoutTrigger]);
+
 
   const indicatorStyle = useAnimatedStyle(() => {
     return {
@@ -123,16 +255,18 @@ export default function TransactionHistoryScreen({ navigation }: any) {
     if (user?.id) {
       fetchData();
     }
-  }, [filterType, filterCategoryId, filterAccountId]);
+  }, [minAmount, maxAmount, filterType, filterCategoryId, filterAccountId]);
 
-  const fetchData = async () => {
+  const fetchData = async (showLoading = true) => {
     if (!user?.id) return;
-    setLoading(true);
+    if (showLoading && transactions.length === 0) setLoading(true);
     const [fetchedTx, fetchedCats, fetchedAccs, userStreak] = await Promise.all([
       getTransactions(user.id, {
         type: filterType || undefined,
         categoryId: filterCategoryId || undefined,
         accountId: filterAccountId || undefined,
+        minAmount: minAmount ? parseFloat(minAmount) : undefined,
+        maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
       }),
       getCategories(user.id),
       getAccounts(user.id),
@@ -155,7 +289,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       setActiveMonth(null);
     }
     
-    setLoading(false);
+    if (showLoading && transactions.length === 0) setLoading(false);
   };
 
   const availableMonths = useMemo(() => {
@@ -222,67 +356,15 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   }, [filteredTransactions]);
 
   const selectedMonthData = availableMonths.find(m => m.key === selectedMonth);
-  const clearFilters = () => { setFilterType(null); setFilterCategoryId(null); setFilterAccountId(null); setShowFilters(false); };
-  const activeFilterCount = (filterType ? 1 : 0) + (filterCategoryId ? 1 : 0) + (filterAccountId ? 1 : 0);
-
-  // Radar chart: compare selected month vs previous month
-  const radarData = useMemo(() => {
-    if (!selectedMonth || transactions.length === 0) return [];
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
-    const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-
-    const currentTotals: Record<string, number> = {};
-    const prevTotals: Record<string, number> = {};
-
-    transactions.forEach(tx => {
-      if (tx.type !== radarType) return;
-      const d = new Date(tx.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const catName = tx.category?.name || 'Other';
-      if (key === selectedMonth) currentTotals[catName] = (currentTotals[catName] || 0) + tx.amount;
-      else if (key === prevKey) prevTotals[catName] = (prevTotals[catName] || 0) + tx.amount;
-    });
-
-    const allCats = new Set([...Object.keys(currentTotals), ...Object.keys(prevTotals)]);
-    let result = Array.from(allCats)
-      .map(cat => ({ label: cat, current: currentTotals[cat] || 0, previous: prevTotals[cat] || 0 }))
-      .sort((a, b) => (b.current + b.previous) - (a.current + a.previous))
-      .slice(0, 6);
-      
-    // Pad to 3 items so the polygon can draw
-    if (result.length > 0 && result.length < 3) {
-      const padding = 3 - result.length;
-      for (let i = 0; i < padding; i++) {
-        result.push({ label: ' '.repeat(i + 1), current: 0, previous: 0 });
-      }
-    }
-    
-    return result;
-  }, [transactions, selectedMonth, radarType]);
-
-  const comparisonData = useMemo(() => {
-    if (!selectedMonth || transactions.length === 0) return null;
-    const [year, month] = selectedMonth.split('-').map(Number);
-    const prevMonth = month === 1 ? 12 : month - 1;
-    const prevYear = month === 1 ? year - 1 : year;
-    const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
-    const prevDate = new Date(prevYear, prevMonth - 1, 1);
-    const prevMonthName = prevDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-    let currentExp = 0, prevExp = 0;
-    transactions.forEach(tx => {
-      if (tx.type !== radarType) return;
-      const d = new Date(tx.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      if (key === selectedMonth) currentExp += tx.amount;
-      else if (key === prevKey) prevExp += tx.amount;
-    });
-
-    const change = prevExp > 0 ? ((currentExp - prevExp) / prevExp * 100) : 0;
-    return { currentExp, prevExp, change, prevMonthName };
-  }, [transactions, selectedMonth, radarType]);
+  const clearFilters = () => { 
+    setFilterType(null); 
+    setFilterCategoryId(null); 
+    setFilterAccountId(null); 
+    setMinAmount('');
+    setMaxAmount('');
+    setShowFilters(false); 
+  };
+  const activeFilterCount = (filterType ? 1 : 0) + (filterCategoryId ? 1 : 0) + (filterAccountId ? 1 : 0) + (minAmount ? 1 : 0) + (maxAmount ? 1 : 0);
 
   const showRadar = comparisonData !== null && filterType === null;
 
@@ -294,7 +376,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           try {
             await deleteTransaction(id, user.id);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            fetchData();
+            fetchData(false);
           } catch (e) {
             Alert.alert('Error', 'Failed to delete transaction');
           }
@@ -360,19 +442,30 @@ export default function TransactionHistoryScreen({ navigation }: any) {
         title="Transactions" 
         index={1}
         rightElement={
-          <TouchableOpacity
-            onPress={() => setShowFilters(!showFilters)}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle Filters"
-            style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
-          >
-            <Funnel size={20} color={colors.background} weight="bold" />
-            {activeFilterCount > 0 && (
-              <View style={[styles.filterBadge, { backgroundColor: colors.background, borderColor: colors.text, borderWidth: 1 }]}>
-                <Text style={[styles.filterBadgeText, { color: colors.text }]}>{activeFilterCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SearchTransactions')}
+              accessibilityRole="button"
+              accessibilityLabel="Search Transactions"
+              style={[styles.addBtn, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}
+            >
+              <MagnifyingGlass size={20} color={colors.text} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowFilters(!showFilters)}
+              accessibilityRole="button"
+              accessibilityLabel="Toggle Filters"
+              style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
+            >
+              <Funnel size={20} color={colors.background} weight="bold" />
+              {activeFilterCount > 0 && (
+                <View style={[styles.filterBadge, { backgroundColor: colors.background, borderColor: colors.text, borderWidth: 1 }]}>
+                  <Text style={[styles.filterBadgeText, { color: colors.text }]}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         }
       />
 
@@ -429,6 +522,8 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           </ScrollView>
         </View>
       )}
+
+
 
       {/* Month Summary */}
       {selectedMonthData && !loading && filteredTransactions.length > 0 && (
@@ -503,6 +598,33 @@ export default function TransactionHistoryScreen({ navigation }: any) {
               </TouchableOpacity>
             ))}
           </View>
+
+          <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Amount Range</Text>
+          <View style={styles.amountInputRow}>
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={[styles.amountInputPrefix, { color: colors.textMuted }]}>{currency}</Text>
+              <TextInput
+                placeholder="Min"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                value={minAmount}
+                onChangeText={setMinAmount}
+                style={[styles.amountInput, { color: colors.text }]}
+              />
+            </View>
+            <View style={{ width: 10, height: 1, backgroundColor: colors.border, marginHorizontal: 8 }} />
+            <View style={[styles.amountInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Text style={[styles.amountInputPrefix, { color: colors.textMuted }]}>{currency}</Text>
+              <TextInput
+                placeholder="Max"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="numeric"
+                value={maxAmount}
+                onChangeText={setMaxAmount}
+                style={[styles.amountInput, { color: colors.text }]}
+              />
+            </View>
+          </View>
         </View>
       )}
 
@@ -525,7 +647,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           initialNumToRender={15}
           maxToRenderPerBatch={15}
           windowSize={10}
-          removeClippedSubviews={true}
+          removeClippedSubviews={false}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 110 }}
           ListHeaderComponent={showRadar ? (
             <View style={[styles.radarCard, { backgroundColor: colors.card }]}>
@@ -547,56 +669,91 @@ export default function TransactionHistoryScreen({ navigation }: any) {
 
               {/* Card Header */}
               <View style={styles.radarHeader}>
-                <View>
+                <Reanimated.View style={labelFadeStyle}>
                   <Text style={[styles.radarSubtitle, { color: colors.textMuted }]}>
                     Compared to {currency} {formatAmount(comparisonData!.prevExp)} in {comparisonData!.prevMonthName}
                   </Text>
-                </View>
+                </Reanimated.View>
                 {comparisonData!.change !== 0 && (
-                  <View style={[
-                    styles.radarBadge,
-                    { backgroundColor: comparisonData!.change > 0 ? (radarType === 'income' ? colors.successBg : colors.dangerBg) : (radarType === 'income' ? colors.dangerBg : colors.successBg) }
-                  ]}>
-                    <Text style={[
-                      styles.radarBadgeText,
-                      { color: comparisonData!.change > 0 ? (radarType === 'income' ? colors.success : colors.danger) : (radarType === 'income' ? colors.danger : colors.success) }
+                  <Reanimated.View style={badgeFadeStyle}>
+                    <View style={[
+                      styles.radarBadge,
+                      { backgroundColor: comparisonData!.change > 0 ? (radarType === 'income' ? colors.successBg : colors.dangerBg) : (radarType === 'income' ? colors.dangerBg : colors.successBg) }
                     ]}>
-                      {comparisonData!.change > 0 ? '↑' : '↓'}{Math.abs(comparisonData!.change).toFixed(1)}%
-                    </Text>
-                  </View>
+                      <Text style={[
+                        styles.radarBadgeText,
+                        { color: comparisonData!.change > 0 ? (radarType === 'income' ? colors.success : colors.danger) : (radarType === 'income' ? colors.danger : colors.success) }
+                      ]}>
+                        {comparisonData!.change > 0 ? '↑' : '↓'}{Math.abs(comparisonData!.change).toFixed(1)}%
+                      </Text>
+                    </View>
+                  </Reanimated.View>
                 )}
               </View>
 
-              {/* Total */}
-              <Text style={[styles.radarTotal, { color: colors.text }]}>
-                {currency} {formatAmount(comparisonData!.currentExp)}
-              </Text>
-
-              {/* Radar Chart */}
-              {radarData.length >= 3 ? (
-                <RadarChart 
-                  data={radarData} 
-                  currentColor={radarType === 'income' ? colors.success : '#8b5cf6'}
-                  previousColor={radarType === 'income' ? '#86efac' : '#d2b48c'}
-                  gridColor={colors.border}
-                  labelColor={colors.text}
-                  isFocused={isFocused}
-                />
+              {/* Animated Total */}
+              <Reanimated.View style={totalFadeStyle}>
+                <Text style={[styles.radarTotal, { color: colors.text }]}>
+                  {currency} {formatAmount(displayedTotal)}
+                </Text>
+              </Reanimated.View>
+              {/* Line Chart */}
+              {lineChartData.prevData.length > 0 ? (
+                <View style={{ marginLeft: -10, marginTop: 10 }}>
+                  <View style={{ width: chartWidth, overflow: 'hidden' }}>
+                    <Reanimated.View style={[chartRevealStyle, { overflow: 'hidden' }]}>
+                      <View style={{ width: chartWidth }}>
+                        <LineChart
+                          areaChart
+                          isAnimated={false}
+                          data={lineChartData.currentData}
+                          data2={lineChartData.prevData}
+                          maxValue={lineChartData.max * 1.1} // Add 10% padding to top
+                          height={160}
+                          width={chartWidth}
+                          spacing={chartWidth / Math.max(lineChartData.prevData.length, 1)}
+                          initialSpacing={0}
+                          color1={radarType === 'income' ? colors.success : colors.primary}
+                          color2={colors.textMuted + '50'}
+                          textColor1={colors.text}
+                          hideDataPoints
+                          dataPointsColor1={radarType === 'income' ? colors.success : colors.primary}
+                          dataPointsColor2="transparent"
+                          startFillColor1={radarType === 'income' ? colors.success : colors.primary}
+                          startFillColor2={colors.textMuted}
+                          startOpacity1={0.2}
+                          endOpacity1={0}
+                          startOpacity2={0}
+                          endOpacity2={0}
+                          thickness1={3}
+                          thickness2={2}
+                          strokeDashArray2={[5, 5]}
+                          hideRules
+                          hideYAxisText
+                          yAxisColor="transparent"
+                          xAxisColor="transparent"
+                          xAxisLabelWidth={25}
+                          xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 11, fontFamily: fontText, marginLeft: -10 }}
+                        />
+                      </View>
+                    </Reanimated.View>
+                  </View>
+                </View>
               ) : (
-                <View style={{ height: 260, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#9aa2ad', fontFamily: fontText }}>No {radarType} data for this period</Text>
+                <View style={{ height: 180, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: colors.textMuted, fontFamily: fontText }}>No {radarType} data for this period</Text>
                 </View>
               )}
 
               {/* Legend */}
-              {radarData.length >= 3 && (
+              {lineChartData.prevData.length > 0 && (
                 <View style={styles.radarLegend}>
                   <View style={styles.radarLegendItem}>
-                    <View style={[styles.radarLegendDot, { backgroundColor: radarType === 'income' ? colors.success : '#8b5cf6' }]} />
+                    <View style={[styles.radarLegendDot, { backgroundColor: radarType === 'income' ? colors.success : colors.primary }]} />
                     <Text style={[styles.radarLegendText, { color: colors.textMuted }]}>This Month</Text>
                   </View>
                   <View style={styles.radarLegendItem}>
-                    <View style={[styles.radarLegendDot, { backgroundColor: radarType === 'income' ? '#86efac' : '#d2b48c' }]} />
+                    <View style={[styles.radarLegendDot, { backgroundColor: colors.textMuted + '50' }]} />
                     <Text style={[styles.radarLegendText, { color: colors.textMuted }]}>{comparisonData!.prevMonthName}</Text>
                   </View>
                 </View>
@@ -695,4 +852,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginLeft: 10,
   },
+  searchContainer: { paddingHorizontal: 20, paddingBottom: 10 },
+  searchInner: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 44, borderRadius: 14, borderWidth: 1 },
+  searchInput: { flex: 1, marginLeft: 8, fontSize: 14, fontFamily: fontText, height: '100%' },
+  
+  amountInputRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  amountInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 40, borderRadius: 12, borderWidth: 1 },
+  amountInputPrefix: { fontSize: 12, fontWeight: '600', marginRight: 4, fontFamily: fontRounded },
+  amountInput: { flex: 1, fontSize: 13, fontFamily: fontText, height: '100%' },
 });

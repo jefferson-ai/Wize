@@ -144,7 +144,13 @@ export const getAIAdvice = async (userId: string): Promise<AIAdvice> => {
           category: a.categoryName,
           increasePercentage: a.increasePercentage,
           amountDifference: a.amountDifference
-        }))
+        })),
+        budgetForecasts: smartInsights.forecasts?.map(f => ({
+          category: f.categoryName,
+          projectedTotal: f.projectedTotal,
+          budgetAmount: f.budgetAmount,
+          overspendAmount: f.overspendAmount
+        })) || []
       };
 
       const controller = new AbortController();
@@ -180,4 +186,123 @@ export const getAIAdvice = async (userId: string): Promise<AIAdvice> => {
   // Brief delay to feel deliberate
   await new Promise(resolve => setTimeout(resolve, 1200));
   return generateLocalAdvice(transactions, budgets, goals, smartInsights.anomalies);
+};
+
+export const sendChatMessage = async (userId: string, message: string, history: any[]): Promise<string> => {
+  // 1. Gather Context
+  const [transactions, budgets, goals, smartInsights] = await Promise.all([
+    getTransactions(userId, { limit: 40 }),
+    getBudgetConsumption(userId),
+    getSavingGoals(userId),
+    getSmartInsights(userId)
+  ]);
+
+  const functionUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+    ? `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ai-chat`
+    : null;
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (functionUrl && anonKey) {
+    try {
+      const context = {
+        recentTransactions: transactions.map(t => ({
+          amount: t.amount,
+          type: t.type,
+          category: t.category?.name,
+          date: t.date,
+          note: t.note
+        })),
+        budgets: budgets.map(b => ({
+          category: b.category?.name,
+          limit: b.amount,
+          spent: b.spent,
+          percentageUsed: b.percentageUsed
+        })),
+        savingGoals: goals.map(g => ({
+          name: g.name,
+          target: g.targetAmount,
+          current: g.currentAmount
+        })),
+        detectedAnomalies: smartInsights.anomalies.map(a => ({
+          category: a.categoryName,
+          increasePercentage: a.increasePercentage,
+          amountDifference: a.amountDifference
+        })),
+        budgetForecasts: smartInsights.forecasts?.map(f => ({
+          category: f.categoryName,
+          projectedTotal: f.projectedTotal,
+          budgetAmount: f.budgetAmount,
+          overspendAmount: f.overspendAmount
+        })) || []
+      };
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || anonKey}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify({ message, history, context }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.reply) {
+          return data.reply;
+        } else {
+          console.log('AI Chat Error response:', data);
+        }
+      } else {
+        console.log('AI Chat non-200 response:', response.status);
+      }
+    } catch (err: any) {
+      console.log('AI Chat Error:', err?.message || err);
+    }
+  }
+
+  // ----------------------------------------------------
+  // Local Fallback Bot (Since Edge Function isn't deployed)
+  // ----------------------------------------------------
+  await new Promise(resolve => setTimeout(resolve, 800)); // Simulate thinking
+  
+  const msgLower = message.toLowerCase();
+  
+  // Calculate some basic stats from context
+  const totalSpent = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + t.amount, 0);
+    
+  if (msgLower.includes('how much') || msgLower.includes('spent') || msgLower.includes('spending')) {
+    return `Based on your recent transactions, you have spent a total of **${totalSpent.toFixed(2)}**. Your highest expense category was usually Food or Transport. Is there a specific category you want to cut back on?`;
+  }
+  
+  if (msgLower.includes('budget') || msgLower.includes('limit')) {
+    if (budgets.length === 0) return "You don't have any active budgets right now. Would you like me to suggest one?";
+    const overBudgets = budgets.filter(b => b.percentageUsed >= 100);
+    if (overBudgets.length > 0) {
+      return `Watch out! You have exceeded your budget for **${overBudgets.map(b => b.category?.name).join(', ')}**. Try to pause non-essential spending there for the rest of the period.`;
+    }
+    return `You have ${budgets.length} active budget(s) and they are all currently on track. Great job!`;
+  }
+  
+  if (msgLower.includes('save') || msgLower.includes('goal')) {
+    if (goals.length === 0) return "You haven't set up any savings goals yet. Setting a concrete goal is the best way to build wealth!";
+    const topGoal = goals[0];
+    const remaining = topGoal.targetAmount - topGoal.currentAmount;
+    return `You are working towards **${topGoal.name}**. You need **${remaining.toFixed(2)}** more to reach your target. Keep it up!`;
+  }
+
+  if (smartInsights.anomalies.length > 0 && (msgLower.includes('spike') || msgLower.includes('unusual'))) {
+    const a = smartInsights.anomalies[0];
+    return `Yes, I noticed your **${a.categoryName}** spending spiked by **${a.increasePercentage}%** compared to last week. Try to be mindful of that category this week.`;
+  }
+
+  return `I'm currently running in **Local Fallback Mode** (Edge Function not deployed). However, I can see you've spent **${totalSpent.toFixed(2)}** recently and have **${budgets.length}** active budgets. What else would you like to know?`;
 };

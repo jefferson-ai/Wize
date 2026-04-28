@@ -34,6 +34,7 @@ export const transactions = sqliteTable('transactions', {
   receiptUrl: text('receipt_url'),
   isRecurring: integer('is_recurring', { mode: 'boolean' }).default(false),
   recurrenceType: text('recurrence_type', { enum: ['daily', 'weekly', 'monthly'] }),
+  nextRecurrenceDate: text('next_recurrence_date'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -69,5 +70,17 @@ export const challenges = sqliteTable('challenges', {
   endDate: text('end_date').notNull(),
   title: text('title').notNull(),
   description: text('description'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const notifications = sqliteTable('notifications', {
+  id: text('id').primaryKey(),
+  userId: text('user_id'),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  type: text('type', { enum: ['alert', 'insight', 'report', 'system'] }).notNull(),
+  isRead: integer('is_read', { mode: 'boolean' }).default(false).notNull(),
+  actionRoute: text('action_route'), // e.g., 'Insights', 'Home'
+  actionTab: text('action_tab'), // optional tab for route
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });

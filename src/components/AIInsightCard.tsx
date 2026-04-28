@@ -1,11 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { WarningCircle, Crosshair, ArrowRight, X } from 'phosphor-react-native';
+import { WarningCircle, Crosshair, ArrowRight, X, ChartLineUp } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 
 interface AIInsightCardProps {
-  type: 'anomaly' | 'challenge';
+  type: 'anomaly' | 'challenge' | 'forecast';
   title: string;
   description: string;
   color: string;
@@ -31,16 +31,23 @@ export default function AIInsightCard({
 }: AIInsightCardProps) {
   const colors = useThemeColors();
   const isAnomaly = type === 'anomaly';
+  const isForecast = type === 'forecast';
+
+  const isAlert = isAnomaly || isForecast;
+  const cardBorderColor = isAlert ? colors.danger + '33' : color + '33';
+  const iconBgColor = isAlert ? colors.danger + '15' : color + '15';
 
   return (
     <View style={[
       styles.container, 
-      { backgroundColor: colors.card, borderColor: isAnomaly ? colors.danger + '33' : color + '33' }
+      { backgroundColor: colors.card, borderColor: cardBorderColor }
     ]}>
       <View style={styles.header}>
-        <View style={[styles.iconBox, { backgroundColor: isAnomaly ? colors.danger + '15' : color + '15' }]}>
+        <View style={[styles.iconBox, { backgroundColor: iconBgColor }]}>
           {isAnomaly ? (
             <WarningCircle size={20} color={colors.danger} weight="fill" />
+          ) : isForecast ? (
+            <ChartLineUp size={20} color={colors.danger} weight="bold" />
           ) : (
             <Crosshair size={20} color={color} />
           )}

@@ -2,6 +2,7 @@ import { db } from '../../db';
 import { transactions, categories, challenges } from '../../db/schema';
 import { eq, and, sql, desc, between } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
+import { getBudgetConsumption } from '../budgets/budgetService';
 
 export interface AnomalyAlert {
   id: string;
@@ -30,15 +31,30 @@ export interface SavingsChallenge {
   isCustom?: boolean;
 }
 
+export interface BudgetForecast {
+  id: string;
+  type: 'forecast';
+  categoryId: string;
+  categoryName: string;
+  categoryColor: string;
+  budgetAmount: number;
+  currentSpent: number;
+  projectedTotal: number;
+  overspendAmount: number;
+  daysRemaining: number;
+}
+
 export async function getSmartInsights(userId: string) {
   const anomalies = await getAnomalyAlerts(userId);
   const activeChallenges = await getActiveChallenges(userId);
   const recommendedChallenge = activeChallenges.length === 0 ? await getRecommendedChallenge(userId) : null;
+  const forecasts = await getBudgetForecasts(userId);
 
   return {
     anomalies,
     activeChallenges,
-    recommendedChallenge
+    recommendedChallenge,
+    forecasts
   };
 }
 
@@ -125,6 +141,54 @@ async function getAnomalyAlerts(userId: string): Promise<AnomalyAlert[]> {
     return alerts;
   } catch (err) {
     console.error('Error in getAnomalyAlerts', err);
+    return [];
+  }
+}
+
+async function getBudgetForecasts(userId: string): Promise<BudgetForecast[]> {
+  try {
+    const budgets = await getBudgetConsumption(userId);
+    const forecasts: BudgetForecast[] = [];
+    const now = new Date();
+
+    budgets.forEach(b => {
+      // Only forecast for monthly budgets to avoid noise
+      if (b.period !== 'monthly') return;
+
+      const startDate = new Date(b.startDate);
+      // Ensure we are in the current budget month
+      if (now.getMonth() !== startDate.getMonth() || now.getFullYear() !== startDate.getFullYear()) return;
+
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const daysElapsed = now.getDate();
+      const daysRemaining = daysInMonth - daysElapsed;
+
+      // Need at least 3 days of data to make a reasonable forecast
+      if (daysElapsed < 3) return;
+
+      const runRate = b.spent / daysElapsed;
+      const projectedTotal = runRate * daysInMonth;
+
+      // If projected to exceed budget by at least 10%
+      if (projectedTotal > b.amount * 1.1 && b.spent > 0) {
+        forecasts.push({
+          id: `forecast-${b.id}`,
+          type: 'forecast',
+          categoryId: b.categoryId,
+          categoryName: b.category?.name || 'Unknown',
+          categoryColor: b.category?.color || '#94a3b8',
+          budgetAmount: b.amount,
+          currentSpent: b.spent,
+          projectedTotal: Math.round(projectedTotal),
+          overspendAmount: Math.round(projectedTotal - b.amount),
+          daysRemaining
+        });
+      }
+    });
+
+    return forecasts.sort((a, b) => b.overspendAmount - a.overspendAmount);
+  } catch (err) {
+    console.error('Error in getBudgetForecasts', err);
     return [];
   }
 }
@@ -268,3 +332,95 @@ export async function acceptChallenge(userId: string, ch: SavingsChallenge) {
     throw err;
   }
 }
+
+export interface ParsedTransaction {
+  amount: number | null;
+  categoryId: string | null;
+  date: string;
+  note: string;
+  type: 'income' | 'expense';
+}
+
+export async function parseTransactionText(
+  text: string, 
+  categoriesData: { id: string, name: string, type: string }[]
+): Promise<ParsedTransaction | null> {
+  const functionUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+    ? `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ai-parser`
+    : null;
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (functionUrl && anonKey) {
+    try {
+      const { supabase } = await import('../../utils/supabase');
+      const session = await supabase.auth.getSession();
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.data.session?.access_token || anonKey}`,
+          'apikey': anonKey,
+        },
+        body: JSON.stringify({ text, categories: categoriesData }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && !data.error) {
+          return data as ParsedTransaction;
+        }
+      }
+    } catch (e) {
+      console.error('AI Parser network error:', e);
+    }
+  }
+
+  // Fallback local regex parsing
+  console.log('AI Parser: Using local fallback');
+  try {
+    const amountMatch = text.match(/[\d,.]+/);
+    const amount = amountMatch ? parseFloat(amountMatch[0].replace(/,/g, '')) : null;
+    
+    const type = text.toLowerCase().includes('earned') || text.toLowerCase().includes('received') || text.toLowerCase().includes('got') 
+      ? 'income' : 'expense';
+
+    // Try to find a category match in the text
+    let matchedCategoryId = null;
+    for (const cat of categoriesData) {
+      if (cat.type === type && text.toLowerCase().includes(cat.name.toLowerCase())) {
+        matchedCategoryId = cat.id;
+        break;
+      }
+    }
+
+    // Try to extract a cleaner note by removing common prefix words and the amount
+    let cleanNote = text.replace(/spent|paid|bought|earned|received|got/gi, '')
+                        .replace(/[\d,.]+/g, '')
+                        .replace(/cedis|ghs|usd|dollars|for|on/gi, '')
+                        .trim()
+                        // Replace multiple spaces with a single space
+                        .replace(/\s+/g, ' ');
+    
+    // If we stripped too much, fallback to the original text
+    if (!cleanNote) cleanNote = text;
+
+    return {
+      amount,
+      categoryId: matchedCategoryId,
+      date: new Date().toISOString(),
+      note: cleanNote.substring(0, 50),
+      type
+    };
+  } catch (e) {
+    console.error('AI Parser local fallback failed:', e);
+    return null;
+  }
+}
+

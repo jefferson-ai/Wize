@@ -4,6 +4,7 @@ import { getSmartInsights, AnomalyAlert, SavingsChallenge } from '../ai/aiServic
 import { db } from '../../db';
 import { challenges } from '../../db/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
 
 // ─── Types ────────────────────────────────────────────────────
 export interface AppNotification {
@@ -16,7 +17,8 @@ export interface AppNotification {
     | 'challenge-failed'
     | 'ai-anomaly'
     | 'ai-challenge'
-    | 'welcome';
+    | 'welcome'
+    | 'report-ready';
   title: string;
   body: string;
   timestamp: string; // ISO string
@@ -198,6 +200,52 @@ export async function generateNotifications(
       timestamp: now,
       iconName: 'CheckCircle2',
       iconColor: '#22c55e',
+    });
+  }
+
+  // ── 7. Report Ready Notifications ───────────────────────────
+  const { reportNotifications } = useAppSettingsStore.getState();
+  if (reportNotifications) {
+    const today = new Date();
+    const isSunday = today.getDay() === 0;
+    const isFirstOfMonth = today.getDate() === 1;
+
+    if (isSunday) {
+      notifications.push({
+        id: `weekly-report-${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`,
+        type: 'report-ready',
+        title: 'Weekly Report Ready 📊',
+        body: 'Your spending report for last week is ready to view. Tap to see your top categories and trends.',
+        timestamp: now,
+        iconName: 'ChartBar',
+        iconColor: '#3b82f6',
+        onPressTarget: 'Planning', // Takes them to Insights/Planning tab
+      });
+    }
+
+    if (isFirstOfMonth) {
+      notifications.push({
+        id: `monthly-report-${today.getFullYear()}-${today.getMonth()}`,
+        type: 'report-ready',
+        title: 'Monthly Report Ready 📈',
+        body: 'Your spending report for last month is ready to view! Did you stay within budget?',
+        timestamp: now,
+        iconName: 'ChartLineUp',
+        iconColor: '#8b5cf6',
+        onPressTarget: 'Planning',
+      });
+    }
+
+    // DEBUG: Always show a test notification for now
+    notifications.push({
+      id: 'test-report-notification',
+      type: 'report-ready',
+      title: 'Test Report Ready 🚀',
+      body: 'This is a test to verify that in-app notifications are working for your reports!',
+      timestamp: now,
+      iconName: 'TrendUp',
+      iconColor: '#10b981',
+      onPressTarget: 'Planning',
     });
   }
 

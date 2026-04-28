@@ -98,6 +98,7 @@ Deno.serve(async (req) => {
       2. Identify one area for improvement or a "leak" in spending (Coach).
       3. Recommend 3 specific, actionable steps the user should take today or this week.
       4. End with a powerful, one-sentence encouragement.
+      5. CRITICAL: If there are any "detectedAnomalies" or "budgetForecasts" in the USER DATA, you MUST explicitly address them. Warn the user if they are forecasted to overspend.
 
       RESPONSE FORMAT (JSON ONLY):
       {

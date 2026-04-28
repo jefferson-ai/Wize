@@ -22,6 +22,7 @@ import { fontDisplay, fontRounded, fontText } from '../theme/fonts';
 import AIInsightCard from '../components/AIInsightCard';
 import UpgradeModal from '../components/UpgradeModal';
 import { getSmartInsights, acceptChallenge, AnomalyAlert, SavingsChallenge } from '../features/ai/aiService';
+import SpendingReportView from '../components/reports/SpendingReportView';
 
 const { width } = Dimensions.get('window');
 
@@ -30,14 +31,14 @@ export default function InsightsScreen({ navigation, route }: any) {
   const { currency, isPro } = useAppSettingsStore();
   const headerInset = useTabHeaderInset();
 
-  const [activeTab, setActiveTab] = useState<'budgets' | 'savings'>(route?.params?.initialTab || 'budgets');
+  const [activeTab, setActiveTab] = useState<'budgets' | 'savings' | 'reports'>(route?.params?.initialTab || 'budgets');
   const [budgets, setBudgets] = useState<any[]>([]);
   const [savingGoals, setSavingGoals] = useState<any[]>([]);
   const [streak, setStreak] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
   const [aiModalVisible, setAiModalVisible] = useState(false);
-  const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null });
+  const [insights, setInsights] = useState<{ anomalies: AnomalyAlert[], activeChallenges: any[], recommendedChallenge: SavingsChallenge | null, forecasts: any[] }>({ anomalies: [], activeChallenges: [], recommendedChallenge: null, forecasts: [] });
   const colors = useThemeColors();
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [upgradeContext, setUpgradeContext] = useState({ title: '', desc: '' });
@@ -125,9 +126,11 @@ export default function InsightsScreen({ navigation, route }: any) {
     }
   };
 
-  const handleDismissInsight = (type: 'anomaly' | 'challenge', id: string) => {
+  const handleDismissInsight = (type: 'anomaly' | 'challenge' | 'forecast', id: string) => {
     if (type === 'anomaly') {
       setInsights(prev => ({ ...prev, anomalies: prev.anomalies.filter(a => a.id !== id) }));
+    } else if (type === 'forecast') {
+      setInsights(prev => ({ ...prev, forecasts: prev.forecasts.filter(f => f.id !== id) }));
     } else {
       setInsights(prev => ({ ...prev, recommendedChallenge: null }));
     }
@@ -301,6 +304,12 @@ export default function InsightsScreen({ navigation, route }: any) {
           >
             <Text style={[styles.tabText, { color: activeTab === 'savings' ? colors.text : colors.textMuted }]}>Savings</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => setActiveTab('reports')}
+            style={[styles.tabBtn, activeTab === 'reports' && { backgroundColor: colors.card }]}
+          >
+            <Text style={[styles.tabText, { color: activeTab === 'reports' ? colors.text : colors.textMuted }]}>Reports</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -311,6 +320,33 @@ export default function InsightsScreen({ navigation, route }: any) {
       >
         {activeTab === 'budgets' ? (
           <View>
+            {/* AI Alerts: Anomalies and Forecasts */}
+            {insights.forecasts?.map(forecast => (
+              <View key={forecast.id} style={{ marginBottom: 16 }}>
+                <AIInsightCard
+                  type="forecast"
+                  title="Forecasted Overspend"
+                  description={`You are projected to exceed your ${forecast.categoryName} budget by ${currency} ${formatAmount(forecast.overspendAmount)}.`}
+                  color={colors.danger}
+                  onDismiss={() => handleDismissInsight('forecast', forecast.id)}
+                  amountLabel={`Proj: ${currency} ${formatAmount(forecast.projectedTotal)} / ${formatAmount(forecast.budgetAmount)}`}
+                  progress={Math.min(1, forecast.projectedTotal / forecast.budgetAmount)}
+                />
+              </View>
+            ))}
+
+            {insights.anomalies?.map(anomaly => (
+              <View key={anomaly.id} style={{ marginBottom: 16 }}>
+                <AIInsightCard
+                  type="anomaly"
+                  title="Unusual Spending Detected"
+                  description={`Your ${anomaly.categoryName} spending is up ${anomaly.increasePercentage}% compared to last week.`}
+                  color={colors.danger}
+                  onDismiss={() => handleDismissInsight('anomaly', anomaly.id)}
+                />
+              </View>
+            ))}
+
             {/* Recommended Challenge Invitation */}
             {insights.recommendedChallenge && (
               <View style={{ marginBottom: 20 }}>
@@ -373,8 +409,10 @@ export default function InsightsScreen({ navigation, route }: any) {
               </View>
             )}
           </View>
-        ) : (
+        ) : activeTab === 'savings' ? (
           renderSavingsView()
+        ) : (
+          <SpendingReportView />
         )}
       </ScrollView>
       </View>
