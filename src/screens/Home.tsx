@@ -112,6 +112,7 @@ export default function HomeScreen({ navigation }: any) {
     if (!user?.id) return;
     await processRecurringTransactions(user.id);
     await ensureDefaultAccount(user.id, currency);
+    await seedDefaultCategories(user.id);
 
     const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, smartInsights] = await Promise.all([
       getDashboardSummary(user.id, undefined, selectedPeriod),

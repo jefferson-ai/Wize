@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import Svg, { Path, Defs, Mask, G, Circle } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -220,21 +220,30 @@ export default function AnimatedDonutChart({
 
         {/* Category list on the right */}
         <Animated.View style={[localStyles.legendList, labelAnimatedStyle]}>
-          {sortedData.slice(0, 5).map((cat, i) => {
-            const percentage =
-              totalValue > 0 ? ((cat.value / totalValue) * 100).toFixed(0) : '0';
-            return (
-              <View key={i} style={localStyles.legendRow}>
-                <View style={[localStyles.legendDot, { backgroundColor: cat.color }]} />
-                <Text style={[localStyles.legendLabel, { color: colors.text }]} numberOfLines={1}>
-                  {cat.label}
-                </Text>
-                <Text style={[localStyles.legendPct, { color: colors.textMuted }]}>
-                  {percentage}%
-                </Text>
-              </View>
-            );
-          })}
+          <ScrollView
+            style={{ maxHeight: 115 }}
+            showsVerticalScrollIndicator={true}
+            nestedScrollEnabled={true}
+            contentContainerStyle={{ paddingRight: 4, paddingBottom: 16 }}
+          >
+            <View style={{ gap: 10 }}>
+              {sortedData.map((cat, i) => {
+                const percentage =
+                  totalValue > 0 ? ((cat.value / totalValue) * 100).toFixed(0) : '0';
+                return (
+                  <View key={i} style={localStyles.legendRow}>
+                    <View style={[localStyles.legendDot, { backgroundColor: cat.color }]} />
+                    <Text style={[localStyles.legendLabel, { color: colors.text }]} numberOfLines={1}>
+                      {cat.label}
+                    </Text>
+                    <Text style={[localStyles.legendPct, { color: colors.textMuted }]}>
+                      {percentage}%
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
         </Animated.View>
       </View>
     </View>

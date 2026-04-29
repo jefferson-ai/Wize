@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Switch } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import { BarChart } from 'react-native-gifted-charts';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAuthStore } from '../../store/authStore';
@@ -59,7 +58,7 @@ export default function SpendingReportView() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
       {/* Header and Toggle */}
-      <Animated.View entering={FadeInDown.duration(400)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
          <Text style={{ fontSize: 24, fontWeight: '700', color: colors.text }}>Spending Reports</Text>
          <TouchableOpacity 
            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: reportNotifications ? colors.successBg : colors.border, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16 }}
@@ -79,10 +78,10 @@ export default function SpendingReportView() {
              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Test</Text>
            </TouchableOpacity>
          )}
-      </Animated.View>
+      </View>
 
       {/* Toggle */}
-      <Animated.View entering={FadeInDown.delay(80).duration(400)} style={[styles.toggleContainer, { backgroundColor: colors.border }]}>
+      <View style={[styles.toggleContainer, { backgroundColor: colors.border }]}>
         <TouchableOpacity 
           onPress={() => setPeriod('weekly')}
           style={[styles.toggleBtn, period === 'weekly' && { backgroundColor: colors.card }]}
@@ -95,10 +94,10 @@ export default function SpendingReportView() {
         >
           <Text style={[styles.toggleText, { color: period === 'monthly' ? colors.text : colors.textMuted }]}>Monthly</Text>
         </TouchableOpacity>
-      </Animated.View>
+      </View>
 
       {/* Summary + Chart Card */}
-      <Animated.View entering={FadeInDown.delay(160).duration(500)} style={[styles.summaryCard, { backgroundColor: colors.card }]}>
+      <View style={[styles.summaryCard, { backgroundColor: colors.card }]}>
         <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Total Spent</Text>
         <Text style={[styles.summaryAmount, { color: colors.text }]}>
           {currency} {report.currentTotal.toLocaleString()}
@@ -143,16 +142,16 @@ export default function SpendingReportView() {
           isAnimated
           animationDuration={600}
         />
-      </Animated.View>
+      </View>
 
       {/* Top Categories */}
       <View style={styles.categoriesContainer}>
-        <Animated.Text entering={FadeInDown.delay(240).duration(400)} style={[styles.sectionTitle, { color: colors.text, marginBottom: 16 }]}>Top Categories</Animated.Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 16 }]}>Top Categories</Text>
         {report.topCategories.length === 0 ? (
            <Text style={{ color: colors.textMuted, marginTop: 12 }}>No spending in this period.</Text>
         ) : (
           report.topCategories.map((cat: any, index: number) => (
-            <Animated.View key={index} entering={FadeInDown.delay(300 + index * 60).duration(400)} style={[styles.categoryRow, { backgroundColor: colors.card }]}>
+            <View key={index} style={[styles.categoryRow, { backgroundColor: colors.card }]}>
                <View style={[styles.catIcon, { backgroundColor: cat.color + '20' }]}>
                  <CategoryIcon categoryName={cat.name} size={20} color={cat.color} />
                </View>
@@ -160,7 +159,7 @@ export default function SpendingReportView() {
                <Text style={[styles.catAmount, { color: colors.text }]}>
                  {currency} {cat.amount.toLocaleString()}
                </Text>
-            </Animated.View>
+            </View>
           ))
         )}
       </View>

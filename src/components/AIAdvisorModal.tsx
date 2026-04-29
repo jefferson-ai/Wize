@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Animated, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Sparkle, CheckCircle, TrendUp, Heart, Warning, PaperPlaneRight, User } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { getAIAdvice, AIAdvice, sendChatMessage } from '../services/aiAdvisor';
@@ -101,12 +102,13 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
   return (
     <Modal
       animationType="slide"
-      transparent={true}
+      presentationStyle="pageSheet"
       visible={isVisible}
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.centeredView}>
-        <View style={[styles.modalView, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 20 }}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <View style={styles.headerTitle}>
@@ -192,15 +194,14 @@ export default function AIAdvisorModal({ isVisible, onClose, userId }: AIAdvisor
               <PaperPlaneRight size={20} color={colors.background} weight="fill" />
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  centeredView: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
-  modalView: { width: '100%', height: '88%', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 0, shadowColor: '#000', shadowOffset: { width: 0, height: -4, }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerTitle: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   iconWrap: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

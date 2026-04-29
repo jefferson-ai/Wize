@@ -28,7 +28,7 @@ const { width } = Dimensions.get('window');
 
 export default function InsightsScreen({ navigation, route }: any) {
   const { user } = useAuthStore();
-  const { currency, isPro } = useAppSettingsStore();
+  const { currency, isPro, hasUsedAiAdvisor, setHasUsedAiAdvisor } = useAppSettingsStore();
   const headerInset = useTabHeaderInset();
 
   const [activeTab, setActiveTab] = useState<'budgets' | 'savings' | 'reports'>(route?.params?.initialTab || 'budgets');
@@ -243,48 +243,71 @@ export default function InsightsScreen({ navigation, route }: any) {
         title="Planning" 
         index={2}
         rightElement={
-          <TouchableOpacity
-            onPress={handleAddAction}
-            accessibilityRole="button"
-            accessibilityLabel={activeTab === 'budgets' ? "Add budget" : "Add goal"}
-            style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
-          >
-            <Plus size={20} color={colors.background} weight="bold" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {hasUsedAiAdvisor && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (!isPro) {
+                    setUpgradeContext({ title: 'AI Financial Strategist', desc: 'Get personalised spending reports, anomaly alerts, and actionable financial coaching powered by AI.' });
+                    setShowUpgrade(true);
+                  } else {
+                    setAiModalVisible(true);
+                  }
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="AI Strategist"
+                style={[styles.aiBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <Sparkle size={20} color={colors.text} weight="fill" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={handleAddAction}
+              accessibilityRole="button"
+              accessibilityLabel={activeTab === 'budgets' ? "Add budget" : "Add goal"}
+              style={[styles.addBtn, { backgroundColor: colors.text, shadowColor: colors.text }]}
+            >
+              <Plus size={20} color={colors.background} weight="bold" />
+            </TouchableOpacity>
+          </View>
         }
       />
 
       <View style={{ height: headerInset }} collapsable={false} />
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* AI Strategist Entry */}
-      <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => {
-            if (!isPro) {
-              setUpgradeContext({ title: 'AI Financial Strategist', desc: 'Get personalised spending reports, anomaly alerts, and actionable financial coaching powered by AI.' });
-              setShowUpgrade(true);
-            } else {
-              setAiModalVisible(true);
-            }
-          }}
-          style={[styles.aiCard, { backgroundColor: colors.text, shadowColor: colors.text }]}
-        >
-          <View style={styles.aiCardContent}>
-            <View style={styles.aiTextContainer}>
-              <View style={styles.aiBadge}>
-                <Sparkle size={12} color={colors.background} weight="fill" style={{ marginRight: 4 }} />
-                <Text style={[styles.aiBadgeText, { color: colors.background }]}>AI Strategy</Text>
+
+      {/* AI Feature Promo — shown only until user tries it */}
+      {!hasUsedAiAdvisor && (
+        <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              setHasUsedAiAdvisor(true);
+              if (!isPro) {
+                setUpgradeContext({ title: 'AI Financial Strategist', desc: 'Get personalised spending reports, anomaly alerts, and actionable financial coaching powered by AI.' });
+                setShowUpgrade(true);
+              } else {
+                setAiModalVisible(true);
+              }
+            }}
+            style={[styles.aiCard, { backgroundColor: colors.text, shadowColor: colors.text }]}
+          >
+            <View style={styles.aiCardContent}>
+              <View style={styles.aiTextContainer}>
+                <View style={styles.aiBadge}>
+                  <Sparkle size={12} color={colors.background} weight="fill" style={{ marginRight: 4 }} />
+                  <Text style={[styles.aiBadgeText, { color: colors.background }]}>New Feature</Text>
+                </View>
+                <Text style={[styles.aiTitle, { color: colors.background }]}>AI Financial Strategist</Text>
+                <Text style={[styles.aiSubtitle, { color: colors.background, opacity: 0.7 }]}>Let AI analyze your habits and coach your spending</Text>
               </View>
-              <Text style={[styles.aiTitle, { color: colors.background }]}>Unlock Financial Insights</Text>
-              <Text style={[styles.aiSubtitle, { color: colors.background, opacity: 0.7 }]}>Let your AI strategist analyze your habits</Text>
+              <View style={[styles.aiIconCircle, { backgroundColor: colors.background + '20' }]}>
+                <Sparkle size={24} color={colors.background} weight="fill" />
+              </View>
             </View>
-            <View style={[styles.aiIconCircle, { backgroundColor: colors.background + '20' }]}>
-              <Sparkle size={24} color={colors.background} weight="fill" />
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
+          </TouchableOpacity>
+        </View>
+      )}
 
 
 
@@ -438,6 +461,7 @@ export default function InsightsScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
+  aiBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   aiCard: { borderRadius: 24, padding: 20, elevation: 8, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 },
   aiCardContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   aiTextContainer: { flex: 1 },

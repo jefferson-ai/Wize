@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet, Animated, Alert, TextInput, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, SectionList, ActivityIndicator, ScrollView, StyleSheet, Animated, Alert, TextInput, Dimensions, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Funnel, Plus, Trash, MagnifyingGlass, X } from 'phosphor-react-native';
 import { Swipeable, RectButton, TouchableOpacity as GHTouchableOpacity } from 'react-native-gesture-handler';
-import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withDelay, interpolateColor, Easing } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, useAnimatedProps, withSpring, withTiming, withDelay, interpolateColor, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store/authStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
@@ -49,6 +49,50 @@ const AnimatedMonthText = ({ month, isActive, onPress, onLayout, colors }: any) 
   );
 };
 
+const AnimatedTextInput = Reanimated.createAnimatedComponent(TextInput);
+
+function CountingText({ startValue, endValue, duration = 900, style }: { startValue: number, endValue: number, duration?: number, style?: any }) {
+  const animatedValue = useSharedValue(startValue);
+
+  useEffect(() => {
+    animatedValue.value = startValue;
+    animatedValue.value = withTiming(endValue, {
+      duration,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [startValue, endValue, duration]);
+
+  const animatedProps = useAnimatedProps(() => {
+    const val = animatedValue.value;
+    const isNegative = val < 0;
+    const absVal = Math.abs(val);
+    const parts = absVal.toFixed(2).split('.');
+    let intPart = parts[0];
+    
+    let result = '';
+    while (intPart.length > 3) {
+      result = ',' + intPart.slice(-3) + result;
+      intPart = intPart.slice(0, -3);
+    }
+    result = intPart + result;
+    
+    return {
+      text: `GHS ${isNegative ? '-' : ''}${result}.${parts[1]}`,
+      // For cross-platform compatibility
+      defaultValue: `GHS ${isNegative ? '-' : ''}${result}.${parts[1]}`
+    } as any;
+  });
+
+  return (
+    <AnimatedTextInput
+      underlineColorAndroid="transparent"
+      editable={false}
+      animatedProps={animatedProps}
+      style={[style, { padding: 0, margin: 0 }]}
+    />
+  );
+};
+
 export default function TransactionHistoryScreen({ navigation }: any) {
   const { user } = useAuthStore();
   const { currency } = useAppSettingsStore();
@@ -86,7 +130,6 @@ export default function TransactionHistoryScreen({ navigation }: any) {
   const totalTranslateY = useSharedValue(8);
   const chartRevealProgress = useSharedValue(0);
 
-  const [displayedTotal, setDisplayedTotal] = useState(0);
   const chartWidth = useMemo(() => Dimensions.get('window').width - 80, []);
 
   const monthScrollRef = useRef<ScrollView>(null);
@@ -139,28 +182,22 @@ export default function TransactionHistoryScreen({ navigation }: any) {
       const isFarFromEnd = (maxDays - 1) - idx > 1;
       
       let labelStr = '';
+      // Only use the standard interval labels
       if (isFirst || isLast || (isMultipleOf5 && isFarFromEnd)) {
         labelStr = String(idx + 1);
       }
 
-      // Mark the end of the shorter month
-      if (daysInCurrentMonth < maxDays && idx === daysInCurrentMonth - 1) {
-        labelStr = `${MONTH_NAMES[month - 1]} end`;
-      } else if (daysInPrevMonth < maxDays && idx === daysInPrevMonth - 1) {
-        labelStr = `${MONTH_NAMES[prevMonth - 1]} end`;
-      }
-
-      return { value: currentSum, label: labelStr, hideDataPoint: true };
+      return { value: currentSum, label: labelStr, hideDataPoint: true, day: idx + 1 };
     });
 
     let prevSum = 0;
-    const prevData = prevDaily.map((val) => {
+    const prevData = prevDaily.map((val, idx) => {
       prevSum += val;
-      return { value: prevSum, hideDataPoint: true };
+      return { value: prevSum, hideDataPoint: true, day: idx + 1 };
     });
 
     const maxVal = Math.max(...currentData.map(d => d.value), ...prevData.map(d => d.value));
-    return { currentData, prevData, max: maxVal > 0 ? maxVal : 100 };
+    return { currentData, prevData, max: maxVal > 0 ? maxVal : 100, maxDays };
   }, [transactions, selectedMonth, radarType]);
 
   const comparisonData = useMemo(() => {
@@ -203,12 +240,10 @@ export default function TransactionHistoryScreen({ navigation }: any) {
     totalOpacity.value = withDelay(500, withTiming(1, timingOpts(400)));
     totalTranslateY.value = withDelay(500, withTiming(0, timingOpts(400)));
 
-    // 2. Set total immediately to prevent state-update thrashing and 60fps re-renders
-    setDisplayedTotal(comparisonData.currentExp);
-
     // 3. Left-to-right chart reveal
     chartRevealProgress.value = 0;
     chartRevealProgress.value = withTiming(1, { duration: 1200, easing: Easing.out(Easing.cubic) });
+
   }, [radarType, comparisonData?.currentExp, comparisonData?.prevExp]);
 
   const labelFadeStyle  = useAnimatedStyle(() => ({ opacity: labelOpacity.value,  transform: [{ translateY: labelTranslateY.value  }] }));
@@ -547,86 +582,105 @@ export default function TransactionHistoryScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Filter Panel */}
-      {showFilters && (
-        <View style={[styles.filterPanel, { backgroundColor: colors.card }]}>
-          <View style={styles.filterHeader}>
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilters}
+        presentationStyle="pageSheet"
+        animationType="slide"
+        onRequestClose={() => setShowFilters(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+          {/* Header */}
+          <View style={[styles.filterHeader, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+            <TouchableOpacity onPress={() => setShowFilters(false)} style={{ padding: 8 }}>
+              <X size={20} color={colors.text} />
+            </TouchableOpacity>
             <Text style={[styles.filterTitle, { color: colors.text }]}>Filters</Text>
-            {activeFilterCount > 0 && (
-              <TouchableOpacity onPress={clearFilters}>
-                <Text style={[styles.clearText, { color: colors.text }]}>Clear All</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Type</Text>
-          <View style={styles.filterTypeRow}>
-            <TouchableOpacity
-              onPress={() => setFilterType(filterType === 'expense' ? null : 'expense')}
-              style={[styles.filterChip, { backgroundColor: colors.background, borderColor: colors.border }, filterType === 'expense' && { backgroundColor: colors.text, borderColor: colors.text }]}
-            >
-              <Text style={[styles.filterChipText, { color: colors.textMuted }, filterType === 'expense' && { color: colors.background }]}>Expense</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setFilterType(filterType === 'income' ? null : 'income')}
-              style={[styles.filterChip, { backgroundColor: colors.background, borderColor: colors.border }, filterType === 'income' && { backgroundColor: colors.text, borderColor: colors.text }]}
-            >
-              <Text style={[styles.filterChipText, { color: colors.textMuted }, filterType === 'income' && { color: colors.background }]}>Income</Text>
+            <TouchableOpacity onPress={clearFilters} style={{ padding: 8 }}>
+              <Text style={[styles.clearText, { color: activeFilterCount > 0 ? colors.text : colors.textMuted }]}>Clear</Text>
             </TouchableOpacity>
           </View>
-          <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Category</Text>
-          <View style={styles.categoryWrap}>
-            {categories.map(cat => (
-              <TouchableOpacity
-                key={cat.id}
-                onPress={() => setFilterCategoryId(filterCategoryId === cat.id ? null : cat.id)}
-                style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, filterCategoryId === cat.id && { borderColor: colors.text }]}
-              >
-                <Text style={[styles.catChipText, { color: colors.textMuted }, filterCategoryId === cat.id && { color: colors.text, fontWeight: '600' }]}>{cat.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
 
-          <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Account</Text>
-          <View style={styles.categoryWrap}>
-            {accounts.map(acc => (
-              <TouchableOpacity
-                key={acc.id}
-                onPress={() => setFilterAccountId(filterAccountId === acc.id ? null : acc.id)}
-                style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, filterAccountId === acc.id && { borderColor: colors.text }]}
-              >
-                <Text style={[styles.catChipText, { color: colors.textMuted }, filterAccountId === acc.id && { color: colors.text, fontWeight: '600' }]}>{acc.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+              <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Type</Text>
+              <View style={styles.filterTypeRow}>
+                <TouchableOpacity
+                  onPress={() => setFilterType(filterType === 'expense' ? null : 'expense')}
+                  style={[styles.filterChip, { backgroundColor: colors.background, borderColor: colors.border }, filterType === 'expense' && { backgroundColor: colors.text, borderColor: colors.text }]}
+                >
+                  <Text style={[styles.filterChipText, { color: colors.textMuted }, filterType === 'expense' && { color: colors.background }]}>Expense</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setFilterType(filterType === 'income' ? null : 'income')}
+                  style={[styles.filterChip, { backgroundColor: colors.background, borderColor: colors.border }, filterType === 'income' && { backgroundColor: colors.text, borderColor: colors.text }]}
+                >
+                  <Text style={[styles.filterChipText, { color: colors.textMuted }, filterType === 'income' && { color: colors.background }]}>Income</Text>
+                </TouchableOpacity>
+              </View>
 
-          <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Amount Range</Text>
-          <View style={styles.amountInputRow}>
-            <View style={[styles.amountInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Text style={[styles.amountInputPrefix, { color: colors.textMuted }]}>{currency}</Text>
-              <TextInput
-                placeholder="Min"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="numeric"
-                value={minAmount}
-                onChangeText={setMinAmount}
-                style={[styles.amountInput, { color: colors.text }]}
-              />
-            </View>
-            <View style={{ width: 10, height: 1, backgroundColor: colors.border, marginHorizontal: 8 }} />
-            <View style={[styles.amountInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Text style={[styles.amountInputPrefix, { color: colors.textMuted }]}>{currency}</Text>
-              <TextInput
-                placeholder="Max"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="numeric"
-                value={maxAmount}
-                onChangeText={setMaxAmount}
-                style={[styles.amountInput, { color: colors.text }]}
-              />
-            </View>
-          </View>
-        </View>
-      )}
+              <Text style={[styles.filterSectionLabel, { color: colors.textMuted }]}>Category</Text>
+              <View style={styles.categoryWrap}>
+                {categories.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    onPress={() => setFilterCategoryId(filterCategoryId === cat.id ? null : cat.id)}
+                    style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, filterCategoryId === cat.id && { borderColor: colors.text }]}
+                  >
+                    <Text style={[styles.catChipText, { color: colors.textMuted }, filterCategoryId === cat.id && { color: colors.text, fontWeight: '600' }]}>{cat.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Account</Text>
+              <View style={styles.categoryWrap}>
+                {accounts.map(acc => (
+                  <TouchableOpacity
+                    key={acc.id}
+                    onPress={() => setFilterAccountId(filterAccountId === acc.id ? null : acc.id)}
+                    style={[styles.catChip, { backgroundColor: colors.background, borderColor: colors.border }, filterAccountId === acc.id && { borderColor: colors.text }]}
+                  >
+                    <Text style={[styles.catChipText, { color: colors.textMuted }, filterAccountId === acc.id && { color: colors.text, fontWeight: '600' }]}>{acc.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.filterSectionLabel, { color: colors.textMuted, marginTop: 14 }]}>Amount Range</Text>
+              <View style={styles.amountInputRow}>
+                <View style={[styles.amountInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[styles.amountInputPrefix, { color: colors.textMuted }]}>{currency}</Text>
+                  <TextInput
+                    placeholder="Min"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                    value={minAmount}
+                    onChangeText={setMinAmount}
+                    style={[styles.amountInput, { color: colors.text }]}
+                  />
+                </View>
+                <View style={{ width: 10, height: 1, backgroundColor: colors.border, marginHorizontal: 8 }} />
+                <View style={[styles.amountInputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[styles.amountInputPrefix, { color: colors.textMuted }]}>{currency}</Text>
+                  <TextInput
+                    placeholder="Max"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="numeric"
+                    value={maxAmount}
+                    onChangeText={setMaxAmount}
+                    style={[styles.amountInput, { color: colors.text }]}
+                  />
+                </View>
+              </View>
+
+            <TouchableOpacity
+              onPress={() => setShowFilters(false)}
+              style={[styles.applyBtn, { backgroundColor: colors.text }]}
+            >
+              <Text style={[styles.applyBtnText, { color: colors.background }]}>Apply Filters</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       {/* Transaction List */}
       {loading ? (
@@ -693,9 +747,11 @@ export default function TransactionHistoryScreen({ navigation }: any) {
 
               {/* Animated Total */}
               <Reanimated.View style={totalFadeStyle}>
-                <Text style={[styles.radarTotal, { color: colors.text }]}>
-                  {currency} {formatAmount(displayedTotal)}
-                </Text>
+                <CountingText 
+                  startValue={comparisonData!.prevExp || 0} 
+                  endValue={comparisonData!.currentExp || 0} 
+                  style={[styles.radarTotal, { color: colors.text }]} 
+                />
               </Reanimated.View>
               {/* Line Chart */}
               {lineChartData.prevData.length > 0 ? (
@@ -709,10 +765,11 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                           data={lineChartData.currentData}
                           data2={lineChartData.prevData}
                           maxValue={lineChartData.max * 1.1} // Add 10% padding to top
-                          height={160}
+                          height={100}
                           width={chartWidth}
-                          spacing={chartWidth / Math.max(lineChartData.prevData.length, 1)}
-                          initialSpacing={0}
+                          disableScroll={true}
+                          spacing={(chartWidth - 24) / Math.max(lineChartData.maxDays - 1, 1)}
+                          initialSpacing={12}
                           color1={radarType === 'income' ? colors.success : colors.primary}
                           color2={colors.textMuted + '50'}
                           textColor1={colors.text}
@@ -734,13 +791,55 @@ export default function TransactionHistoryScreen({ navigation }: any) {
                           xAxisColor="transparent"
                           xAxisLabelWidth={25}
                           xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 11, fontFamily: fontText, marginLeft: -10 }}
+                          pointerConfig={{
+                            pointerStripHeight: 120,
+                            pointerStripColor: radarType === 'income' ? colors.success : colors.primary,
+                            pointerStripWidth: 2,
+                            pointerColor: radarType === 'income' ? colors.success : colors.primary,
+                            radius: 4,
+                            pointerLabelWidth: 100,
+                            pointerLabelHeight: 90,
+                            activatePointersOnLongPress: true,
+                            autoAdjustPointerLabelPosition: true,
+                            pointerLabelComponent: items => {
+                              const currentItem = items[0];
+                              const prevItem = items[1];
+                              if (!currentItem) return null;
+                              return (
+                                <View style={{
+                                  backgroundColor: colors.card,
+                                  padding: 8,
+                                  borderRadius: 8,
+                                  borderWidth: 1,
+                                  borderColor: colors.border,
+                                  shadowColor: '#000',
+                                  shadowOffset: { width: 0, height: 4 },
+                                  shadowOpacity: 0.1,
+                                  shadowRadius: 8,
+                                  elevation: 5,
+                                }}>
+                                  <Text style={{ color: colors.textMuted, fontSize: 10, fontFamily: fontText, marginBottom: 4 }}>
+                                    Day {currentItem.day}
+                                  </Text>
+                                  <Text style={{ color: colors.text, fontSize: 12, fontFamily: fontDisplay, fontWeight: '700' }}>
+                                    {currency} {currentItem.value.toFixed(2)}
+                                  </Text>
+                                  {prevItem && (
+                                    <Text style={{ color: colors.textMuted, fontSize: 10, fontFamily: fontText, marginTop: 2 }}>
+                                      Prev: {currency} {prevItem.value.toFixed(2)}
+                                    </Text>
+                                  )}
+                                </View>
+                              );
+                            },
+                          }}
                         />
                       </View>
                     </Reanimated.View>
                   </View>
                 </View>
               ) : (
-                <View style={{ height: 180, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ height: 120, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: colors.textMuted, fontFamily: fontText }}>No {radarType} data for this period</Text>
                 </View>
               )}
@@ -805,10 +904,14 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 14, fontWeight: '700', fontFamily: fontText },
   summaryDivider: { width: 1, backgroundColor: '#e8eaec' },
 
-  filterPanel: { backgroundColor: '#ffffff', marginHorizontal: 20, marginBottom: 10, borderRadius: 20, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1 },
-  filterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  filterTitle: { fontWeight: '700', color: '#212529', fontSize: 15, fontFamily: fontText },
-  clearText: { color: '#212529', fontWeight: '600', fontSize: 13, fontFamily: fontText },
+  filterOverlay: { flex: 1, justifyContent: 'flex-end' },
+  filterSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '75%' },
+  filterHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#ccc', alignSelf: 'center', marginBottom: 16 },
+  applyBtn: { marginTop: 20, paddingVertical: 16, borderRadius: 20, alignItems: 'center' },
+  applyBtnText: { fontSize: 16, fontWeight: '700', fontFamily: fontRounded },
+  filterHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, marginBottom: 14 },
+  filterTitle: { fontWeight: '700', color: '#212529', fontSize: 17, fontFamily: fontDisplay },
+  clearText: { color: '#212529', fontWeight: '600', fontSize: 16, fontFamily: fontText },
   filterSectionLabel: { fontSize: 11, fontWeight: '700', color: '#9aa2ad', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, fontFamily: fontText },
   filterTypeRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e8eaec' },

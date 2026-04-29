@@ -319,10 +319,7 @@ export default function MainNavigator() {
             <AppStack.Screen
               name="AddTransaction"
               component={AddTransactionScreen}
-              options={{ 
-                presentation: 'transparentModal',
-                animation: 'slide_from_bottom' 
-              }}
+              options={{ presentation: 'modal' }}
             />
             <AppStack.Screen
               name="AddBudget"

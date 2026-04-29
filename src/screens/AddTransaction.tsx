@@ -175,11 +175,7 @@ export default function AddTransactionScreen({ navigation, route }: any) {
   };
 
   return (
-    <View style={styles.overlay}>
-      <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => navigation.canGoBack() && navigation.goBack()} />
-      <View style={[styles.sheet, { backgroundColor: colors.card }]}>
-        <View style={[styles.handle, { backgroundColor: colors.handle }]} />
-        <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
               
@@ -453,15 +449,10 @@ export default function AddTransactionScreen({ navigation, route }: any) {
             </View>
           </KeyboardAvoidingView>
         </SafeAreaView>
-      </View>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: { backgroundColor: '#ffffff', borderTopLeftRadius: 28, borderTopRightRadius: 28, flex: 0.95, paddingTop: 10 },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 4 },
 
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
   closeBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#f5f6f7', alignItems: 'center', justifyContent: 'center' },
