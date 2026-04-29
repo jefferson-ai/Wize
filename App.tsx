@@ -1,4 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native';
+import { enableScreens } from 'react-native-screens';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
@@ -17,6 +18,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from './src/db';
 import migrations from './drizzle/migrations';
 
+enableScreens(true);
 
 export default function App() {
   useAppNotifications();

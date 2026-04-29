@@ -12,6 +12,8 @@ import { getCategories } from '../features/categories/categoryService';
 import { getAccounts } from '../features/accounts/accountService';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import CategoryIcon from '../components/CategoryIcon';
+import TransactionItem from '../components/TransactionItem';
+
 import { formatAmount } from '../utils/formatters';
 import { LineChart } from 'react-native-gifted-charts';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -118,6 +120,15 @@ export default function TransactionHistoryScreen({ navigation }: any) {
 
   const [streak, setStreak] = useState(0);
   const [streakModalVisible, setStreakModalVisible] = useState(false);
+  const [interactionsComplete, setInteractionsComplete] = useState(false);
+
+  useEffect(() => {
+    const handle = requestIdleCallback(() => {
+      setInteractionsComplete(true);
+    }, { timeout: 1000 });
+    return () => cancelIdleCallback(handle);
+  }, []);
+
   const confettiRef = useRef<ConfettiRef>(null);
   const prevStreak = useRef<number | null>(null);
 
@@ -419,56 +430,16 @@ export default function TransactionHistoryScreen({ navigation }: any) {
     ]);
   };
 
-  const renderRightActions = (id: string, progress: any, dragX: any) => {
-    const scale = progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.8, 1],
-      extrapolate: 'clamp',
-    });
-
-    return (
-      <GHTouchableOpacity
-        activeOpacity={0.6}
-        onPress={() => handleDelete(id)}
-        style={[styles.deleteAction, { backgroundColor: colors.dangerBg }]}
-      >
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Trash size={22} color={colors.danger} />
-        </Animated.View>
-      </GHTouchableOpacity>
-    );
-  };
-
   const renderTransaction = ({ item }: { item: any }) => (
-    <Swipeable
-      key={item.id}
-      renderRightActions={(progress, dragX) => renderRightActions(item.id, progress, dragX)}
-      friction={1.5}
-      rightThreshold={40}
-    >
-      <RectButton
-        style={[styles.txRow, { backgroundColor: colors.card }]}
-        onPress={() => navigation.navigate('EditTransaction', { transaction: item })}
-        accessibilityRole="button"
-        accessibilityLabel={`Edit ${item.category?.name || 'Unknown'} transaction`}
-      >
-        <View style={[styles.txIcon, { backgroundColor: (item.category?.color || '#94a3b8') + '22' }]}>
-          <CategoryIcon categoryName={item.category?.name} size={20} color={item.category?.color || '#94a3b8'} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.txName, { color: colors.text }]}>{item.category?.name || 'Unknown'}</Text>
-          {item.note && <Text style={[styles.txNote, { color: colors.textMuted }]} numberOfLines={1}>{item.note}</Text>}
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={[styles.txAmount, { color: item.type === 'income' ? colors.success : colors.danger }]}>
-            {item.type === 'income' ? '+' : '-'}{currency} {formatAmount(item.amount)}
-          </Text>
-          <Text style={[styles.txDate, { color: colors.textMuted }]}>
-            {new Date(item.date).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-          </Text>
-        </View>
-      </RectButton>
-    </Swipeable>
+    <TransactionItem
+      item={item}
+      currency={currency}
+      colors={colors}
+      fontDisplay={fontDisplay}
+      fontText={fontText}
+      onPress={(tx) => navigation.navigate('EditTransaction', { transaction: tx })}
+      onDelete={handleDelete}
+    />
   );
 
   return (
@@ -703,7 +674,7 @@ export default function TransactionHistoryScreen({ navigation }: any) {
           windowSize={10}
           removeClippedSubviews={false}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 110 }}
-          ListHeaderComponent={showRadar ? (
+          ListHeaderComponent={showRadar && interactionsComplete ? (
             <View style={[styles.radarCard, { backgroundColor: colors.card }]}>
               {/* Toggle Header */}
               <View style={[styles.radarToggleRow, { backgroundColor: colors.background }]}>

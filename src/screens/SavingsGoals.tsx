@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Plus, Crosshair, Sparkle, TrendUp, Info } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useAuthStore } from '../store/authStore';

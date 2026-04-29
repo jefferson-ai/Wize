@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable, TouchableOpacity as GHTouchableOpacity, RectButton, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import {
   X, Bell, Flame, Wallet, CheckCircle, Warning, Trash, Sparkle,

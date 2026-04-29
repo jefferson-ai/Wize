@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, StyleSheet, ActivityIndicator, Keyboard } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MagnifyingGlass, X, Funnel } from 'phosphor-react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -9,6 +9,7 @@ import { getTransactions } from '../features/transactions/transactionService';
 import CategoryIcon from '../components/CategoryIcon';
 import { formatAmount } from '../utils/formatters';
 import { fontDisplay, fontText } from '../theme/fonts';
+import { FlashList } from '@shopify/flash-list';
 
 const HighlightedText = ({ text, highlight, style, colors }: any) => {
   if (!highlight.trim()) {
@@ -29,6 +30,39 @@ const HighlightedText = ({ text, highlight, style, colors }: any) => {
     </Text>
   );
 };
+
+const SearchTransactionItem = React.memo(({ item, query, currency, colors, onPress }: any) => {
+  return (
+    <TouchableOpacity 
+      style={[styles.resultItem, { backgroundColor: colors.card, borderBottomColor: 'transparent' }]}
+      onPress={() => onPress(item)}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: (item.category?.color || '#94a3b8') + '22' }]}>
+        <CategoryIcon categoryName={item.category?.name} size={18} color={item.category?.color || '#94a3b8'} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <HighlightedText 
+          text={item.note || item.category?.name || 'Unknown'} 
+          highlight={query} 
+          style={[styles.title, { color: colors.text, fontFamily: fontDisplay }]} 
+          colors={colors}
+        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+          <View style={[styles.dot, { backgroundColor: item.category?.color || '#94a3b8' }]} />
+          <Text style={[styles.category, { color: colors.textMuted, fontFamily: fontText }]}>{item.category?.name || 'Uncategorized'}</Text>
+        </View>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <Text style={[styles.amount, { color: item.type === 'income' ? colors.success : colors.danger, fontFamily: fontDisplay }]}>
+          {item.type === 'income' ? '+' : '-'}{currency}{formatAmount(item.amount)}
+        </Text>
+        <Text style={[styles.date, { color: colors.textMuted, fontFamily: fontText }]}>
+          {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 export default function SearchTransactionsScreen({ navigation }: any) {
   const colors = useThemeColors();
@@ -68,36 +102,19 @@ export default function SearchTransactionsScreen({ navigation }: any) {
     }
   };
 
-  const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={[styles.resultItem, { borderBottomColor: colors.border }]}
-      onPress={() => navigation.navigate('EditTransaction', { transaction: item })}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: (item.category?.color || '#94a3b8') + '22' }]}>
-        <CategoryIcon categoryName={item.category?.name} size={18} color={item.category?.color || '#94a3b8'} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <HighlightedText 
-          text={item.note || item.category?.name || 'Unknown'} 
-          highlight={query} 
-          style={[styles.title, { color: colors.text }]} 
-          colors={colors}
-        />
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-          <View style={[styles.dot, { backgroundColor: item.category?.color || '#94a3b8' }]} />
-          <Text style={[styles.category, { color: colors.textMuted }]}>{item.category?.name || 'Uncategorized'}</Text>
-        </View>
-      </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={[styles.amount, { color: item.type === 'income' ? colors.success : colors.danger }]}>
-          {item.type === 'income' ? '+' : '-'}{currency}{formatAmount(item.amount)}
-        </Text>
-        <Text style={[styles.date, { color: colors.textMuted }]}>
-          {new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const handleItemPress = React.useCallback((item: any) => {
+    navigation.navigate('EditTransaction', { transaction: item });
+  }, [navigation]);
+
+  const renderItem = React.useCallback(({ item }: { item: any }) => (
+    <SearchTransactionItem
+      item={item}
+      query={query}
+      currency={currency}
+      colors={colors}
+      onPress={handleItemPress}
+    />
+  ), [query, currency, colors, handleItemPress]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -130,22 +147,25 @@ export default function SearchTransactionsScreen({ navigation }: any) {
       </View>
 
       {/* Results */}
-      <FlatList
-        data={results}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyState}>
-            {query.length < 2 ? (
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>Type at least 2 characters to search</Text>
-            ) : !loading ? (
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>No transactions found for "{query}"</Text>
-            ) : null}
-          </View>
-        )}
-        onScrollBeginDrag={() => Keyboard.dismiss()}
-      />
+      <View style={{ flex: 1 }}>
+        <FlashList
+          data={results}
+          keyExtractor={item => item.id}
+          renderItem={renderItem}
+          estimatedItemSize={76}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyState}>
+              {query.length < 2 ? (
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>Type at least 2 characters to search</Text>
+              ) : !loading ? (
+                <Text style={[styles.emptyText, { color: colors.textMuted }]}>No transactions found for "{query}"</Text>
+              ) : null}
+            </View>
+          )}
+          onScrollBeginDrag={() => Keyboard.dismiss()}
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -178,6 +198,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     alignItems: 'center', 
     paddingVertical: 16, 
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 8,
     borderBottomWidth: 1 
   },
   iconContainer: { 

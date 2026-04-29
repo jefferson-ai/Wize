@@ -1,0 +1,51 @@
+Unused files (7)
+babel.config.js                          
+src/components/Numpad.tsx                
+src/components/RadarChart.tsx            
+src/utils/categoryEmojis.ts              
+supabase/functions/ai-chat/index.ts      
+supabase/functions/ai-parser/index.ts    
+supabase/functions/get-ai-advice/index.ts
+Unused dependencies (14)
+@expo/ngrok                          package.json:12:6
+@google/generative-ai                package.json:13:6
+@react-navigation/bottom-tabs        package.json:17:6
+@react-navigation/material-top-tabs  package.json:18:6
+@supabase/ssr                        package.json:21:6
+@tanstack/react-query                package.json:23:6
+babel-plugin-inline-import           package.json:24:6
+eslint                               package.json:26:6
+expo-application                     package.json:28:6
+expo-device                          package.json:32:6
+expo-linking                         package.json:37:6
+expo-localization                    package.json:38:6
+prettier                             package.json:48:6
+react-native-pager-view              package.json:54:6
+Unused devDependencies (2)
+@types/uuid        package.json:66:6
+babel-preset-expo  package.json:67:6
+Unlisted dependencies (4)
+expo-updates    app.config.js
+expo-system-ui  app.config.js
+expo-updates    app.json     
+expo-system-ui  app.json     
+Unused exports (12)
+HeaderDataContext                   src/components/AnimatedHeader.tsx:41:14         
+getCategoryIconComponent  function  src/components/CategoryIcon.tsx:85:17           
+STREAK_MILESTONES                   src/components/StreakBadges.tsx:7:14            
+expoDb                              src/db/index.ts:7:14                            
+getActiveChallenges       function  src/features/ai/aiService.ts:257:23             
+getActiveBudgets          function  src/features/budgets/budgetService.ts:33:23     
+DEFAULT_CATEGORIES                  src/features/categories/categoryService.ts:29:14
+requestPushPermissions    function  src/features/notifications/pushService.ts:14:23 
+updateSavingGoal          function  src/features/savings/savingsService.ts:37:23    
+navigate                  function  src/navigation/navigationRef.ts:6:17            
+TAB_HEADER_BODY                     src/navigation/tabHeaderInset.ts:4:14           
+ensureDefaultCategories   function  src/utils/seedData.ts:25:23                     
+Unused exported types (6)
+BudgetForecast        interface  src/features/ai/aiService.ts:34:18                   
+ParsedTransaction     interface  src/features/ai/aiService.ts:336:18                  
+TransactionInsert     type       src/features/transactions/transactionService.ts:11:13
+MainTabParamList      type       src/navigation/types.ts:26:13                        
+RootStackScreenProps  type       src/navigation/types.ts:34:13                        
+ThemeColors           type       src/theme/colors.ts:59:13                            

@@ -17,6 +17,14 @@ export default function SpendingReportView() {
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [interactionsComplete, setInteractionsComplete] = useState(false);
+
+  useEffect(() => {
+    const handle = requestIdleCallback(() => {
+      setInteractionsComplete(true);
+    }, { timeout: 1000 });
+    return () => cancelIdleCallback(handle);
+  }, []);
 
   useEffect(() => {
     if (user?.id) {
@@ -28,7 +36,7 @@ export default function SpendingReportView() {
     }
   }, [period, user?.id]);
 
-  if (loading || !report) {
+  if (!interactionsComplete || loading || !report) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={colors.text} />

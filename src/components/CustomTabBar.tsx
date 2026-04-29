@@ -181,12 +181,12 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       
       <BlurView 
         intensity={100} 
-        tint="dark" 
+        tint={isDark ? "light" : "dark"} 
         style={[
           styles.rightIsland, 
           { 
-            borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.2)',
-            backgroundColor: 'rgba(0,0,0,0.3)' 
+            borderColor: isDark ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)',
+            backgroundColor: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)' 
           }
         ]}
       >
@@ -197,7 +197,7 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
           accessibilityRole="button"
           accessibilityLabel="Add Transaction"
         >
-          <Plus size={26} color="#ffffff" strokeWidth={2.5} />
+          <Plus size={26} color={isDark ? '#000000' : '#ffffff'} strokeWidth={2.5} />
         </TouchableOpacity>
       </BlurView>
     </View>
