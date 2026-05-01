@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, useColorScheme, Platform } from 'react-native';
 import { Home, CreditCard, Plus, BarChart2, Settings } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, withSpring, interpolate, Extrapolate } from 'react-native-reanimated';
@@ -163,7 +163,19 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
       style={[styles.wrapper, { paddingBottom: bottomPadding }]}
       pointerEvents="box-none"
     >
-      <BlurView intensity={80} tint={blurTint} style={[styles.leftIsland, { borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
+      <BlurView 
+        intensity={Platform.OS === 'ios' ? 80 : 100} 
+        tint={blurTint} 
+        style={[
+          styles.leftIsland, 
+          { 
+            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+            backgroundColor: Platform.OS === 'android' 
+              ? (isDark ? 'rgba(18, 18, 18, 0.92)' : 'rgba(255, 255, 255, 0.92)')
+              : 'transparent'
+          }
+        ]}
+      >
         <Animated.View
           style={[
             {
@@ -186,7 +198,9 @@ export default function CustomTabBar({ state, descriptors, navigation, position:
           styles.rightIsland, 
           { 
             borderColor: isDark ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)',
-            backgroundColor: isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)' 
+            backgroundColor: isDark 
+              ? (Platform.OS === 'android' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.85)')
+              : (Platform.OS === 'android' ? 'rgba(15, 15, 15, 0.95)' : 'rgba(0,0,0,0.85)')
           }
         ]}
       >

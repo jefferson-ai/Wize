@@ -18,6 +18,9 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from './src/db';
 import migrations from './drizzle/migrations';
 
+import { useAuthStore } from './src/store/authStore';
+import { syncData } from './src/features/sync/syncService';
+
 enableScreens(true);
 
 export default function App() {
@@ -27,6 +30,7 @@ export default function App() {
   const { setColorScheme } = useColorScheme();
   const systemColorScheme = useNativeColorScheme();
   const { theme } = useAppSettingsStore();
+  const { user } = useAuthStore();
   const isDark = theme === 'dark' || (theme === 'system' && systemColorScheme === 'dark');
   const { success, error } = useMigrations(db, migrations);
 
@@ -37,6 +41,13 @@ export default function App() {
     const resolvedTheme = theme === 'system' ? (systemColorScheme === 'dark' ? 'dark' : 'light') : theme;
     setColorScheme(resolvedTheme);
   }, [theme, systemColorScheme, setColorScheme]);
+
+  // Trigger sync on app startup
+  useEffect(() => {
+    if (success && user?.id) {
+      syncData(user.id).catch(err => console.warn('Startup sync failed:', err));
+    }
+  }, [success, user?.id]);
 
   if (error) {
     return (

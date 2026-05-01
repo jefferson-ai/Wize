@@ -141,7 +141,7 @@ function HeaderLayer({
       const to = morph.toIdx.value;
 
       if (idx === from && idx === to) {
-        return { opacity: 1, transform: [{ scale: 1 }] };
+        return { opacity: 1, transform: [{ scale: 1 }], zIndex: 10 };
       }
       if (idx === from) {
         const opacity = 1 - t;
@@ -149,6 +149,7 @@ function HeaderLayer({
         return {
           opacity: opacity < 0.05 ? 0 : opacity,
           transform: [{ scale }],
+          zIndex: opacity > 0.5 ? 10 : 0,
         };
       }
       if (idx === to) {
@@ -157,6 +158,7 @@ function HeaderLayer({
         return {
           opacity: opacity < 0.05 ? 0 : opacity,
           transform: [{ scale }],
+          zIndex: opacity > 0.5 ? 10 : 0,
         };
       }
       return { opacity: 0, transform: [{ scale: 0.85 }] };
@@ -169,6 +171,9 @@ function HeaderLayer({
     return {
       opacity: opacity < 0.05 ? 0 : opacity,
       transform: [{ scale }],
+      // On Android, invisible views still block touches. 
+      // We use zIndex to bring the active header to the front.
+      zIndex: opacity > 0.5 ? 10 : 0,
     };
   });
 

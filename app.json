@@ -25,6 +25,7 @@
       }
     },
     "android": {
+      "package": "com.anonymous.SpendWise",
       "adaptiveIcon": {
         "backgroundColor": "#f0fdf4",
         "foregroundImage": "./assets/android-icon-foreground.png",
