@@ -1,1 +1,1 @@
-# SpendWise
+# Wize
