@@ -71,14 +71,8 @@ export default function AddTransactionScreen({ navigation, route }: any) {
     setCategories(filtered);
     if (filtered.length > 0 && !selectedCategory) setSelectedCategory(filtered[0].id);
 
-    // Ensure at least one account exists
-    let finalAccs = accs;
-    if (accs.length === 0) {
-      const def = await ensureDefaultAccount(user.id, currency);
-      finalAccs = [def];
-    }
-    setAccounts(finalAccs);
-    if (finalAccs.length > 0 && !selectedAccountId) setSelectedAccountId(finalAccs[0].id);
+    setAccounts(accs);
+    if (accs.length > 0 && !selectedAccountId) setSelectedAccountId(accs[0].id);
   };
 
   const selectedCat = categories.find((c) => c.id === selectedCategory);

@@ -111,7 +111,6 @@ export default function HomeScreen({ navigation }: any) {
   const loadData = async () => {
     if (!user?.id) return;
     await processRecurringTransactions(user.id);
-    await ensureDefaultAccount(user.id, currency);
     await seedDefaultCategories(user.id);
 
     const [dashSummary, total, allAccounts, recent, consumption, userStreak, loggedToday, goals, smartInsights] = await Promise.all([
@@ -306,7 +305,7 @@ export default function HomeScreen({ navigation }: any) {
                 </TouchableOpacity>
               </View>
               <View style={styles.brandBadge}>
-                <Text style={styles.brandBadgeText}>SpendWise</Text>
+                <Text style={styles.brandBadgeText}>Wize</Text>
               </View>
             </View>
 

@@ -191,7 +191,7 @@ export default function SettingsScreen({ navigation }: any) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.proTitle, { color: colors.text }]}>
-              {isPro ? 'SpendWise Pro' : 'SpendWise Free'}
+              {isPro ? 'Wize Pro' : 'Wize Free'}
             </Text>
             <Text style={[styles.proDesc, { color: colors.textMuted }]}>
               {isPro ? 'You have access to all premium features' : 'Upgrade to unlock AI, unlimited goals & more'}

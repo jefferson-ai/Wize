@@ -47,7 +47,7 @@ export async function exportTransactionsToCSV(userId: string) {
       throw new Error('Document directory is not accessible');
     }
     
-    const fileName = `SpendWise_Export_${new Date().getTime()}.csv`;
+    const fileName = `Wize_Export_${new Date().getTime()}.csv`;
     const filePath = `${FileSystem.documentDirectory}${fileName}`;
     
     await FileSystem.writeAsStringAsync(filePath, csvString, {
@@ -60,7 +60,7 @@ export async function exportTransactionsToCSV(userId: string) {
     if (isSharingAvailable) {
       await Sharing.shareAsync(filePath, {
         mimeType: 'text/csv',
-        dialogTitle: 'Export SpendWise Transactions',
+        dialogTitle: 'Export Wize Transactions',
         UTI: 'public.comma-separated-values-text' // helps iOS recognize CSV
       });
     } else {

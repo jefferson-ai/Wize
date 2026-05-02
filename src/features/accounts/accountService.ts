@@ -27,7 +27,28 @@ export const createAccount = async (data: Omit<Account, 'id' | 'createdAt'>): Pr
     id: uuidv4(),
     createdAt: new Date(),
   };
+  
+  // 1. Create the account record
   await db.insert(accounts).values(newAccount);
+  
+  // 2. If there's a starting balance, create a "Starting Balance" transaction
+  // so that reconciliation logic (sum of transactions) matches the balance.
+  if (newAccount.balance !== 0) {
+    await db.insert(transactions).values({
+      id: uuidv4(),
+      userId: newAccount.userId,
+      accountId: newAccount.id,
+      amount: Math.abs(newAccount.balance),
+      type: newAccount.balance > 0 ? 'income' : 'expense',
+      date: newAccount.createdAt.toISOString(),
+      note: 'Starting Balance',
+      currency: newAccount.currency,
+      categoryId: null, // Uncategorized for initial balance
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+  }
+  
   syncData(newAccount.userId).catch(err => console.warn('Account sync failed', err));
   return newAccount;
 };
@@ -45,9 +66,18 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
   const acc = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
   const userId = acc[0]?.userId;
 
-  // First delete all transactions associated with the account to maintain data integrity
+  // 1. Delete from Supabase first
+  if (userId) {
+    const { supabase } = await import('../../utils/supabase');
+    await Promise.all([
+      supabase.from('transactions').delete().eq('account_id', accountId),
+      supabase.from('accounts').delete().eq('id', accountId)
+    ]);
+  }
+
+  // 2. Delete all transactions locally
   await db.delete(transactions).where(eq(transactions.accountId, accountId));
-  // Then delete the account
+  // 3. Delete the account locally
   await db.delete(accounts).where(eq(accounts.id, accountId));
 
   if (userId) syncData(userId).catch(err => console.warn('Account delete sync failed', err));

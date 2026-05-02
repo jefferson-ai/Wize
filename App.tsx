@@ -13,6 +13,7 @@ import './global.css';
 import { navigationRef } from './src/navigation/navigationRef';
 import { useAppNotifications } from './src/hooks/useAppNotifications';
 import { useAppQuickActions } from './src/hooks/useAppQuickActions';
+import { OfflineIndicator } from './src/components/OfflineIndicator';
 
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from './src/db';
@@ -72,6 +73,7 @@ export default function App() {
           <RootNavigator />
           <StatusBar style={isDark ? 'light' : 'dark'} />
         </NavigationContainer>
+        <OfflineIndicator />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

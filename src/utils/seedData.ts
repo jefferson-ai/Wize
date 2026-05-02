@@ -219,6 +219,19 @@ export async function seed1YearStudentData(userId: string) {
 
 export async function clearAllData(userId: string) {
   try {
+    // 1. Delete from Supabase first (to prevent sync from bringing it back)
+    const { supabase } = await import('../utils/supabase');
+    
+    await Promise.all([
+      supabase.from('transactions').delete().eq('user_id', userId),
+      supabase.from('budgets').delete().eq('user_id', userId),
+      supabase.from('saving_goals').delete().eq('user_id', userId),
+      supabase.from('accounts').delete().eq('user_id', userId),
+      supabase.from('categories').delete().eq('user_id', userId),
+      supabase.from('challenges').delete().eq('user_id', userId),
+    ]);
+
+    // 2. Delete from local SQLite
     await db.delete(transactions).where(eq(transactions.userId, userId));
     await db.delete(budgets).where(eq(budgets.userId, userId));
     await db.delete(savingGoals).where(eq(savingGoals.userId, userId));

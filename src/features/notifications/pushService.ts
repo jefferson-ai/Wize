@@ -88,7 +88,7 @@ export async function sendTestNotification() {
   await Notifications.scheduleNotificationAsync({
     content: {
       title: 'Test Notification 🔔',
-      body: 'This is a test notification from SpendWise! It works!',
+      body: 'This is a test notification from Wize! It works!',
       data: { test: true },
     },
     trigger: {

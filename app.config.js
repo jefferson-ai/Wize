@@ -1,7 +1,7 @@
 export default {
   expo: {
-    name: 'SpendWise',
-    slug: 'SpendWise',
+    name: 'Wize',
+    slug: 'Wize',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
@@ -13,19 +13,20 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.anonymous.SpendWise',
+      bundleIdentifier: 'com.jefferson.wize',
       infoPlist: {
+        ITSAppUsesNonExemptEncryption: false,
         CFBundleURLTypes: [
           {
             CFBundleURLSchemes: [
-              'com.googleusercontent.apps.919301720713-jf1vlmhqj9oq3ngct1rmd8sbs6lk457d',
+              'com.googleusercontent.apps.919301720713-9pve3c7n8f88rhg6ne9pa2c9507iac3c',
             ],
           },
         ],
       },
     },
     android: {
-      package: 'com.anonymous.SpendWise',
+      package: 'com.jefferson.wize',
       adaptiveIcon: {
         backgroundColor: '#f0fdf4',
         foregroundImage: './assets/android-icon-foreground.png',
@@ -53,11 +54,16 @@ export default {
         '@react-native-google-signin/google-signin',
         {
           iosClientId:
-            '919301720713-jf1vlmhqj9oq3ngct1rmd8sbs6lk457d.apps.googleusercontent.com',
+            '919301720713-9pve3c7n8f88rhg6ne9pa2c9507iac3c.apps.googleusercontent.com',
           iosUrlScheme:
-            'com.googleusercontent.apps.919301720713-jf1vlmhqj9oq3ngct1rmd8sbs6lk457d',
+            'com.googleusercontent.apps.919301720713-9pve3c7n8f88rhg6ne9pa2c9507iac3c',
         },
       ],
     ],
+    extra: {
+      eas: {
+        projectId: '3b857e37-ddbc-4dce-87e4-65618ec806c2',
+      },
+    },
   },
 };

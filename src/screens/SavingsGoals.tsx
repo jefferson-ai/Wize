@@ -111,7 +111,7 @@ export default function SavingsGoalsScreen({ navigation }: any) {
               Track specific items like a "New Car" or "Emergency Fund" and fill your buckets!
             </Text>
             <TouchableOpacity 
-               onPress={() => Alert.alert('Tip', 'SpendWise automatically tracks your progress once you create goals!')}
+               onPress={() => Alert.alert('Tip', 'Wize automatically tracks your progress once you create goals!')}
                style={styles.learnMoreBtn}
             >
               <Text style={[styles.learnMoreText, { color: colors.primary }]}>How it works</Text>

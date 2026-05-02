@@ -109,7 +109,11 @@ export async function deleteTransaction(id: string, userId: string) {
       }
     }
 
-    // 2. Delete the record
+    // 2. Delete from Supabase first
+    const { supabase } = await import('../../utils/supabase');
+    await supabase.from('transactions').delete().eq('id', id).eq('user_id', userId);
+
+    // 3. Delete the local record
     await db
       .delete(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));

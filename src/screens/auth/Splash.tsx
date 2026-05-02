@@ -16,7 +16,7 @@ export default function SplashScreen() {
         resizeMode="contain" 
       />
       <Text style={[styles.title, { color: colors.text }]}>
-        SpendWise
+        Wize
       </Text>
       <ActivityIndicator size="large" color={colors.text} />
     </View>

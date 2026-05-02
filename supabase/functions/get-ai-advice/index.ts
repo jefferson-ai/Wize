@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     }
 
     const prompt = `
-      You are an Executive Financial Strategist and Encouraging Mentor for an app called SpendWise.
+      You are an Executive Financial Strategist and Encouraging Mentor for an app called Wize.
       Analyze the following user financial data and provide personalized, high-level strategic advice.
       
       USER DATA:

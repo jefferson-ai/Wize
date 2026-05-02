@@ -195,7 +195,7 @@ export async function generateNotifications(
     notifications.push({
       id: 'welcome',
       type: 'welcome',
-      title: 'Welcome to SpendWise! 🎉',
+      title: 'Welcome to Wize! 🎉',
       body: 'Start tracking your expenses daily to build a healthy financial habit. Log your first transaction to get started!',
       timestamp: now,
       iconName: 'CheckCircle2',

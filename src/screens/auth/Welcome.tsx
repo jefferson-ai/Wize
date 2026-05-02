@@ -31,7 +31,7 @@ export default function WelcomeScreen({ navigation }: AuthStackScreenProps<'Welc
 
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: colors.text }]}>
-            Welcome {'\n'}to SpendWise 👋
+            Welcome {'\n'}to Wize 👋
           </Text>
           
           <Text style={[styles.description, { color: colors.textMuted }]}>

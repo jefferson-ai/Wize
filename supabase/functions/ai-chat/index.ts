@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     }
 
     const systemPrompt = `
-      You are an Executive Financial Strategist and Conversational Assistant for the SpendWise app.
+      You are an Executive Financial Strategist and Conversational Assistant for the Wize app.
       Your tone should be encouraging, direct, and highly intelligent.
       
       Here is the user's current financial context. Base your answers strictly on this data if asked about their spending, budgets, or goals.
